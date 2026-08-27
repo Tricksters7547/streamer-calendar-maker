@@ -424,6 +424,16 @@
     box-shadow: 0 0 10px -1px var(--main-color);
   }
 
+  /* 관리자 모드에서 "일정 추가" 대상으로 클릭해서 고른 날짜 -> 서브 컬러로 강조 */
+  .day-cell.selected {
+    border: 1.5px solid var(--sub-color);
+    box-shadow: 0 0 10px -1px var(--sub-color);
+  }
+
+  /* 관리자 모드일 때만 JS가 이 클래스를 달아서 클릭 가능함을 알려준다 */
+  .day-cell.clickable { cursor: pointer; }
+  .day-cell.clickable:hover { background: rgba(255,255,255,0.13); }
+
   .day-num {
     font-size: 14px;
     font-weight: 700;
@@ -665,9 +675,10 @@
         </p>
 
         <!-- 시트를 직접 열지 않고도 이 폼으로 바로 행을 추가할 수 있다.
-             (내부적으로는 결국 시트에 새 행을 쓰는 것과 동일하다) -->
+             (내부적으로는 결국 시트에 새 행을 쓰는 것과 동일하다)
+             오른쪽 캘린더에서 날짜 칸을 클릭하면 아래 날짜가 자동으로 채워진다. -->
         <div class="field">
-          <label for="newScheduleDate">날짜</label>
+          <label for="newScheduleDate">날짜 (오른쪽 캘린더 클릭으로도 선택 가능)</label>
           <input type="date" id="newScheduleDate" />
         </div>
         <div class="field">
@@ -758,6 +769,8 @@ const state = {
   // schedules는 더 이상 이 페이지에서 직접 입력하지 않는다. syncSchedulesFromSheet()가
   // 구글 시트를 읽어서 채워주는, 읽기 전용 캐시라고 보면 된다.
   schedules: {},                      // { "2026-08-18": [{id, category, text}], ... }
+  // 관리자가 캘린더에서 클릭해서 고른, "일정 추가" 대상 날짜 (일반 방문자는 사용 안 함)
+  selectedDateKey: null,
 
   // 카테고리도 고정값이 아니라 유저가 추가/삭제할 수 있는 상태로 관리한다.
   // "방송시작"/"합방"의 color는 var(--main-color)/var(--sub-color) 문자열을 그대로 저장해서
@@ -1117,6 +1130,16 @@ function renderCalendar() {
     if (weekdayIdx === 6) cellEl.classList.add('sat');
     cellEl.dataset.dateKey = key;
 
+    // 관리자 모드에서는 날짜 칸을 클릭해서 "일정 추가" 폼의 날짜를 바로 채울 수 있다
+    if (isAdminUnlocked()) {
+      cellEl.classList.add('clickable');
+      if (key === state.selectedDateKey) cellEl.classList.add('selected');
+      cellEl.addEventListener('click', (e) => {
+        if (e.target.closest('.tag-delete')) return; // 삭제 버튼 클릭은 무시
+        selectDateForNewSchedule(key);
+      });
+    }
+
     const numEl = document.createElement('div');
     numEl.className = 'day-num';
     numEl.textContent = cell.day;
@@ -1166,6 +1189,16 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+/* 캘린더에서 날짜 칸을 클릭했을 때 : "일정 데이터" 폼의 날짜 입력창을
+   바로 채워주고, 그 칸을 서브 컬러로 강조해서 지금 뭘 고른 건지 보여준다.
+   (관리자 모드에서만 호출됨 — renderCalendar의 클릭 핸들러 참고) */
+function selectDateForNewSchedule(key) {
+  state.selectedDateKey = key;
+  if (newScheduleDate) newScheduleDate.value = key;
+  renderCalendar();
+  if (newScheduleText) newScheduleText.focus();
 }
 
 /* ================================================================
