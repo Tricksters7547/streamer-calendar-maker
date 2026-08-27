@@ -703,7 +703,7 @@
           카테고리 목록만 이 브라우저에 저장돼요 (컬러·배경·제목·일정은
           이미 구글 시트가 모두에게 자동으로 보여줍니다).
           카테고리 변경도 다른 방문자에게 반영하려면, 아래 버튼으로 복사해서
-          Claude 대화창에 붙여넣어 "배포해줘"라고 요청해주세요.
+          매실이한테 "배포해줘"라고 요청해주세요.
         </p>
         <button type="button" class="add-btn" id="exportConfigBtn">📤 설정 복사하기 (배포 요청용)</button>
       </section>
@@ -1559,7 +1559,7 @@ async function addScheduleInBackground(date, category, text, seq) {
   } catch (err) {
     console.error(err);
     const message =
-      err.message === 'APPS_SCRIPT_NOT_CONFIGURED' ? 'Apps Script 연동이 아직 설정되지 않았어요 (Claude에게 문의해주세요)'
+      err.message === 'APPS_SCRIPT_NOT_CONFIGURED' ? 'Apps Script 연동이 아직 설정되지 않았어요 (매실이에게 문의해주세요)'
       : err.message === 'WRITE_NOT_VERIFIED' ? `"${text}" 추가가 반영되지 않았어요 — 로그아웃 후 다시 로그인해서 시도해주세요`
       : `"${text}" 추가 실패 — 인터넷 연결과 Apps Script 배포 상태를 확인해주세요`;
     scheduleWriteStatus.className = 'sheet-status error';
@@ -1590,7 +1590,7 @@ async function deleteScheduleFromSheet(sch, dateKey) {
   } catch (err) {
     console.error(err);
     showToast(
-      err.message === 'APPS_SCRIPT_NOT_CONFIGURED' ? 'Apps Script 연동이 아직 설정되지 않았어요 (Claude에게 문의해주세요)'
+      err.message === 'APPS_SCRIPT_NOT_CONFIGURED' ? 'Apps Script 연동이 아직 설정되지 않았어요 (매실이에게 문의해주세요)'
       : err.message === 'DELETE_NOT_VERIFIED' ? '삭제가 반영되지 않았어요 — 로그아웃 후 다시 로그인해서 시도해주세요'
       : '삭제 실패 — 인터넷 연결과 Apps Script 배포 상태를 확인해주세요'
     );
@@ -1691,7 +1691,7 @@ if (saveSettingsToSheetBtn) {
       console.error(err);
       settingsWriteStatus.classList.add('error');
       settingsWriteStatus.textContent =
-        err.message === 'APPS_SCRIPT_NOT_CONFIGURED' ? 'Apps Script 연동이 아직 설정되지 않았어요 (Claude에게 문의해주세요)'
+        err.message === 'APPS_SCRIPT_NOT_CONFIGURED' ? 'Apps Script 연동이 아직 설정되지 않았어요 (매실이에게 문의해주세요)'
         : err.message === 'WRITE_NOT_VERIFIED' ? '저장이 반영되지 않았어요 — 로그아웃 후 다시 로그인해서 시도해주세요'
         : '저장 실패 — 인터넷 연결과 Apps Script 배포 상태를 확인해주세요';
       showToast('시트 저장에 실패했어요');
@@ -1717,7 +1717,7 @@ exportConfigBtn.addEventListener('click', async () => {
 
   try {
     await navigator.clipboard.writeText(json);
-    showToast('설정을 클립보드에 복사했어요 — Claude에게 붙여넣어 주세요 📋');
+    showToast('설정을 클립보드에 복사했어요 — 매실이에게 붙여넣어 주세요 📋');
   } catch (err) {
     console.error(err);
     // 클립보드 API를 못 쓰는 환경(권한 거부 등)에서는 수동 복사용 창을 띄운다.
