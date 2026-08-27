@@ -173,6 +173,46 @@
   }
   input[type="text"]::placeholder { color: #6b6980; }
 
+  /* "일정 데이터" 폼의 날짜 선택 필드 — 눈에 띄는 카드 느낌으로 강조 */
+  input.date-picker {
+    width: 100%;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, rgba(185, 140, 249, 0.10), rgba(255, 143, 199, 0.08));
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    outline: none;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  input.date-picker:hover { border-color: rgba(255, 255, 255, 0.3); }
+  input.date-picker:focus {
+    border-color: var(--main-color);
+    box-shadow: 0 0 0 3px rgba(185, 140, 249, 0.18);
+  }
+  /* 브라우저 기본 달력 아이콘은 어두운 배경에서 잘 안 보이므로 반전시키고,
+     호버 시 포인트 컬러 배지처럼 보이게 한다 */
+  input.date-picker::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(1.4);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: background 0.15s, filter 0.15s;
+  }
+  input.date-picker::-webkit-calendar-picker-indicator:hover {
+    background: var(--main-color);
+    filter: invert(0) brightness(1);
+  }
+  .date-picker-hint {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
   /* color-scheme: dark 를 지원하지 않는 브라우저를 위한 보조 장치
      -> 드롭다운을 열었을 때 옵션 목록의 배경/글자색을 명시적으로 지정 */
   select option {
@@ -678,8 +718,9 @@
              (내부적으로는 결국 시트에 새 행을 쓰는 것과 동일하다)
              오른쪽 캘린더에서 날짜 칸을 클릭하면 아래 날짜가 자동으로 채워진다. -->
         <div class="field">
-          <label for="newScheduleDate">날짜 (오른쪽 캘린더 클릭으로도 선택 가능)</label>
-          <input type="date" id="newScheduleDate" />
+          <label for="newScheduleDate">📅 날짜</label>
+          <input type="date" id="newScheduleDate" class="date-picker" />
+          <p class="date-picker-hint">오른쪽 캘린더에서 날짜를 클릭하면 자동으로 채워져요 ✨</p>
         </div>
         <div class="field">
           <label for="newScheduleCategory">카테고리</label>
