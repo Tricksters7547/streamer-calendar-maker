@@ -219,25 +219,6 @@
     color: var(--text-main);
   }
 
-  /* 선택된 날짜 표시 배지 */
-  .selected-date-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--line);
-    font-size: 12.5px;
-    color: var(--text-dim);
-    width: 100%;
-  }
-  .selected-date-badge.active {
-    color: var(--text-main);
-    border-color: var(--main-color);
-  }
-  .selected-date-badge b { color: var(--main-color); font-weight: 700; }
-
   /* 카테고리 관리 : 현재 카테고리 목록(칩) */
   .category-list {
     display: flex;
@@ -322,24 +303,6 @@
     margin: 0 0 14px;
   }
   .sheet-help b { color: var(--text-main); }
-
-  .sheet-file-warning {
-    display: none; /* JS가 file:// 로 열린 경우에만 보여준다 */
-    font-size: 11.5px;
-    line-height: 1.6;
-    color: #ffb4b4;
-    background: rgba(255, 90, 90, 0.12);
-    border: 1px solid rgba(255, 90, 90, 0.35);
-    border-radius: var(--radius-sm);
-    padding: 10px 12px;
-    margin: 0 0 14px;
-  }
-  .sheet-file-warning code {
-    background: rgba(0, 0, 0, 0.3);
-    padding: 1px 5px;
-    border-radius: 4px;
-  }
-  .sheet-file-warning b { color: #fff; }
 
   .sheet-status {
     margin-top: 10px;
@@ -482,23 +445,16 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
-    cursor: pointer;
     overflow: hidden;
     transition: border-color 0.15s, background 0.15s;
   }
-  .day-cell:hover { background: rgba(255,255,255,0.12); }
 
-  .day-cell.other-month { opacity: 0.28; cursor: default; }
-  .day-cell.other-month:hover { background: rgba(255, 255, 255, 0.07); }
+  .day-cell.other-month { opacity: 0.28; }
 
-  /* "오늘" 날짜 -> 메인 컬러로 강조 (요구사항 2번) */
+  /* "오늘" 날짜 -> 메인 컬러로 강조 */
   .day-cell.today {
     border: 1.5px solid var(--main-color);
     box-shadow: 0 0 10px -1px var(--main-color);
-  }
-  /* 유저가 방금 클릭해 선택한 날짜 -> 서브 컬러로 강조 */
-  .day-cell.selected {
-    border: 1.5px solid var(--sub-color);
   }
 
   .day-num {
@@ -532,14 +488,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .tag .tag-x {
-    flex-shrink: 0;
-    cursor: pointer;
-    opacity: 0.6;
-    font-size: 9px;
-  }
-  .tag .tag-x:hover { opacity: 1; }
-
   /* 태그 배경/글자색은 카테고리마다 다르므로 JS에서 인라인 스타일로 지정한다
      (배경색 대비를 계산해 글자색을 자동으로 흰색/검은색 중 고른다) */
 
@@ -563,6 +511,30 @@
   }
   .download-btn:hover { transform: translateY(-2px); }
   .download-btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
+
+  /* ---------- 구글 시트 동기화 표시줄 (누구에게나 보임) ---------- */
+  .sync-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+  .sync-row #manualSyncBtn {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.4s, border-color 0.15s;
+  }
+  .sync-row #manualSyncBtn:hover { border-color: var(--main-color); color: var(--main-color); }
+  .sync-row #manualSyncBtn.spinning { animation: spin 0.8s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   /* ---------- 토스트 알림 (alert 대체) ---------- */
   #toast {
@@ -621,7 +593,7 @@
 
         <div id="adminLockedView">
           <p class="sheet-help">
-            색상 · 배경 · 카테고리 · 일정을 편집하려면 관리자 비밀번호를 입력하세요.
+            색상 · 배경 · 카테고리를 편집하려면 관리자 비밀번호를 입력하세요.
             일반 방문자는 완성된 캘린더 보기와 PNG 저장만 가능해요.
           </p>
           <div class="field">
@@ -695,67 +667,32 @@
         </div>
       </section>
 
-      <!-- 5. 일정 등록 -->
+      <!-- 5. 일정 데이터 : 이제 구글 시트가 유일한 데이터 소스.
+           방문자가 페이지를 열 때마다(관리자든 아니든) 자동으로 이 시트를
+           읽어와서 캘린더에 반영하므로, 일정을 바꾸고 싶으면 시트만 고치면
+           되고 배포/Claude 요청이 필요 없다. -->
       <section class="section">
-        <div class="section-title"><span class="num">5</span> 일정 등록</div>
-
-        <div class="field">
-          <label>선택된 날짜</label>
-          <div class="selected-date-badge" id="selectedDateBadge">
-            오른쪽 달력에서 날짜를 먼저 클릭해주세요
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="categorySelect">카테고리</label>
-          <!-- 옵션 목록은 JS의 renderCategories()가 state.categories 기준으로 채운다 -->
-          <select id="categorySelect"></select>
-        </div>
-
-        <div class="field">
-          <label for="scheduleText">내용</label>
-          <input type="text" id="scheduleText" placeholder="예: 21시 발로란트 저챗" maxlength="18" />
-        </div>
-
-        <button type="button" class="add-btn" id="addScheduleBtn">+ 일정 태그 추가</button>
+        <div class="section-title"><span class="num">5</span> 일정 데이터</div>
+        <p class="sheet-help">
+          일정은 연결된 구글 시트에서 <b>모든 방문자에게 자동으로</b> 반영돼요.
+          추가·수정·삭제는 이 페이지가 아니라 <b>시트를 직접 편집</b>해서 하면 됩니다.
+        </p>
+        <p class="sheet-help">
+          열 구성: <b>A=날짜(YYYY-MM-DD) · B=카테고리 · C=내용</b>, 1행은 헤더로 비워두세요.
+          카테고리 칸에는 왼쪽 "카테고리 관리"에 있는 이름을 그대로 적으면 자동 매칭됩니다.
+        </p>
+        <button type="button" class="add-btn" id="manualSyncBtnAdmin">🔄 지금 다시 불러오기</button>
       </section>
 
-      <!-- 6. 구글 시트 연동 -->
+      <!-- 6. 배포용 설정 내보내기 (색상 · 배경 · 제목 · 카테고리 목록에만 해당.
+           일정 데이터는 위 5번 시트가 대신하므로 여기서 다루지 않는다) -->
       <section class="section">
-        <div class="section-title"><span class="num">6</span> 구글 시트에서 불러오기</div>
-
+        <div class="section-title"><span class="num">6</span> 다른 사람에게도 보이게 하기</div>
         <p class="sheet-help">
-          같은 스프레드시트에 <b>날짜(YYYY-MM-DD) · 카테고리 · 내용</b> 3열로 된
-          탭을 만들고, 공유 설정을 <b>"링크가 있는 모든 사용자 - 뷰어"</b>로 바꾼 뒤
-          그 탭 URL을 아래에 붙여넣어주세요.<br />
-          카테고리 칸에는 왼쪽 "카테고리 관리"에 있는 이름(방송시작/휴방/합방/유튜브 등)을
-          그대로 적으면 자동으로 매칭됩니다.
-        </p>
-
-        <!-- 파일을 더블클릭(file://)으로 연 경우에만 JS가 보여주는 경고.
-             이 상태에서는 구글 시트 불러오기가 애초에 동작할 수 없기 때문에
-             버튼을 눌러보기 전에 먼저 알려준다. -->
-        <p class="sheet-file-warning" id="sheetFileWarning">
-          ⚠️ 지금 파일을 더블클릭해서 연 상태(<code>file://</code>)라 이 기능은 동작하지 않아요.
-          GitHub Pages/Netlify 같은 곳에 올려서 <b>웹 주소(http/https)</b>로 접속했을 때만 사용할 수 있습니다.
-        </p>
-
-        <div class="field">
-          <label for="sheetUrlInput">시트 탭 URL</label>
-          <input type="text" id="sheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/…/edit#gid=…" />
-        </div>
-
-        <button type="button" class="add-btn" id="loadSheetBtn">📥 시트에서 불러오기</button>
-        <div class="sheet-status" id="sheetStatus"></div>
-      </section>
-
-      <!-- 7. 배포용 설정 내보내기 -->
-      <section class="section">
-        <div class="section-title"><span class="num">7</span> 다른 사람에게도 보이게 하기</div>
-        <p class="sheet-help">
-          이 사이트는 서버가 없어서, 지금 편집한 내용은 <b>이 브라우저에만</b> 저장돼요.
-          팬들이 접속했을 때도 이 설정이 보이게 하려면, 아래 버튼으로 설정을 복사해서
-          Claude 대화창에 붙여넣어 "배포해줘"라고 요청해주세요. 실제 사이트에 반영해드릴게요.
+          색상 · 배경 이미지 · 캘린더 제목 · 카테고리 목록은 이 브라우저에만 저장돼요
+          (일정은 5번 시트가 이미 모두에게 자동으로 보여줍니다).
+          이 항목들도 다른 방문자에게 반영하려면, 아래 버튼으로 복사해서
+          Claude 대화창에 붙여넣어 "배포해줘"라고 요청해주세요.
         </p>
         <button type="button" class="add-btn" id="exportConfigBtn">📤 설정 복사하기 (배포 요청용)</button>
       </section>
@@ -795,6 +732,14 @@
 
       <button type="button" class="download-btn" id="downloadBtn">📥 PNG로 다운로드</button>
 
+      <!-- 구글 시트 동기화 상태 : 관리자 여부와 상관없이 누구에게나 보이는
+           읽기 전용 표시. 새로고침 버튼도 데이터를 바꾸는 게 아니라 다시
+           읽어오기만 하므로 방문자도 눌러도 안전하다. -->
+      <div class="sync-row">
+        <span id="publicSyncIndicator">🔄 동기화 대기 중...</span>
+        <button type="button" id="manualSyncBtn" title="구글 시트에서 다시 불러오기">↻</button>
+      </div>
+
     </main>
   </div>
 
@@ -810,7 +755,8 @@
 const state = {
   viewYear: new Date().getFullYear(),
   viewMonth: new Date().getMonth(),   // 0 ~ 11
-  selectedDateKey: null,              // 현재 일정 등록 대상으로 선택된 날짜
+  // schedules는 더 이상 이 페이지에서 직접 입력하지 않는다. syncSchedulesFromSheet()가
+  // 구글 시트를 읽어서 채워주는, 읽기 전용 캐시라고 보면 된다.
   schedules: {},                      // { "2026-08-18": [{id, category, text}], ... }
 
   // 카테고리도 고정값이 아니라 유저가 추가/삭제할 수 있는 상태로 관리한다.
@@ -891,32 +837,47 @@ const DEFAULT_STATE = {
     { key: 'collab',  label: '합방',     color: 'var(--sub-color)' },
     { key: 'youtube', label: '유튜브',   color: '#ff5b5b' },
   ],
-  schedules: {},
+  // schedules는 여기 없다 — 일정은 항상 아래 SCHEDULE_SHEET를 실시간으로 읽어서 채운다.
   bgImage: null,
   bgFileLabel: '',
 };
 
 /* ---------------------------------------------------------------
-   관리자 모드 (비밀번호 잠금)
-   - 이 파일은 서버가 없는 정적 페이지라, 여기서 하는 "로그인"은
-     진짜 보안이 아니라 팬들이 실수로/장난으로 설정을 못 건드리게
-     막는 정도의 가벼운 잠금이다. 페이지 소스나 개발자 도구를 볼 줄
-     아는 사람은 우회할 수 있다는 걸 감안해야 한다 (민감한 비밀번호
-     재사용 금지).
-   - 비밀번호 원문 대신 SHA-256 해시만 코드에 남겨서, 최소한 "소스
-     보기"만으로 원문이 바로 드러나지는 않게 한다.
+   연결된 구글 시트 설정
+   - 이 값들은 배포 시 한 번 정해두는 "설정"이라, 바뀔 일이 거의 없다.
+   - 반면 시트 "안의 내용"(비밀번호, 일정 행)은 관리자가 시트를 열어
+     자유롭게 바꿀 수 있고, 그 변경은 코드 수정이나 재배포 없이
+     방문자가 새로고침하는 즉시 반영된다.
+--------------------------------------------------------------- */
+const CREDENTIALS_SHEET = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1577649692' };
+const SCHEDULE_SHEET    = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1998787329' };
+
+function sheetCsvUrl(sheet) {
+  return `https://docs.google.com/spreadsheets/d/${sheet.id}/export?format=csv&gid=${sheet.gid}`;
+}
+
+async function fetchSheetCsv(sheet) {
+  const res = await fetch(sheetCsvUrl(sheet));
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.text();
+}
+
+/* ---------------------------------------------------------------
+   관리자 모드 (비밀번호 잠금 — 구글 시트로 계정 관리)
+   - 비밀번호를 코드에 박아두지 않고 CREDENTIALS_SHEET의 A1 셀에서 그때그때
+     읽어온다. 그래서 관리자는 코드를 건드리거나 재배포를 요청할 필요 없이
+     시트 셀 하나만 고치면 비밀번호를 바꿀 수 있다.
+   - ⚠️ 이 파일은 서버가 없는 정적 페이지라, 여기서 하는 "로그인"은 진짜
+     보안이 아니라 팬들이 실수로/장난으로 설정을 못 건드리게 막는 정도의
+     가벼운 잠금이다. 게다가 CREDENTIALS_SHEET는 CSV로 공개 조회가 가능해야
+     동작하므로, 비밀번호는 사실상 "공개된 값"이나 마찬가지다 (URL을 알거나
+     페이지 소스를 볼 줄 아는 사람은 그대로 읽을 수 있음). 민감한 용도의
+     비밀번호는 절대 재사용하지 말 것.
    - 잠금 해제 상태는 localStorage에 저장해서, 같은 기기/브라우저에서는
-     다시 열어도 매번 비밀번호를 칠 필요가 없게 한다("이 기기 기억하기"
-     와 같은 개념). 다른 사람 컴퓨터라면 로그아웃해두면 된다.
+     다시 열어도 매번 비밀번호를 칠 필요가 없게 한다. 다른 사람 컴퓨터라면
+     로그아웃해두면 된다.
 --------------------------------------------------------------- */
 const ADMIN_SESSION_KEY = 'streamerCalendarMaker.adminUnlocked.v1';
-const ADMIN_PASSWORD_HASH = '0c51a3fa6c2547353df4840972267132512a7061ecceb4605276c80032097c03'; // sha256("Trick0405")
-
-async function sha256Hex(text) {
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 function isAdminUnlocked() {
   try {
@@ -940,20 +901,51 @@ function applyAdminModeUI(isAdmin) {
   adminUnlockedView.style.display = isAdmin ? 'block' : 'none';
 }
 
+function showAdminLoginError(message) {
+  adminLoginError.textContent = message;
+  adminLoginError.style.display = 'block';
+}
+
 async function tryAdminLogin() {
-  const hash = await sha256Hex(adminPasswordInput.value);
-  if (hash === ADMIN_PASSWORD_HASH) {
-    try { localStorage.setItem(ADMIN_SESSION_KEY, '1'); } catch (err) { /* 무시 */ }
-    adminPasswordInput.value = '';
-    adminLoginError.style.display = 'none';
-    applyAdminModeUI(true);
-    loadState(); // 관리자 전용 데이터(이 브라우저의 작업본)를 새로 불러온다
-    renderCategories();
-    renderCalendar();
-    showToast('관리자 모드로 전환했어요 🔓');
-  } else {
-    adminLoginError.style.display = 'block';
-    showToast('비밀번호가 올바르지 않아요');
+  const input = adminPasswordInput.value;
+  if (!input) {
+    showToast('비밀번호를 입력해주세요');
+    return;
+  }
+  if (location.protocol === 'file:') {
+    showAdminLoginError('파일을 더블클릭해서 연 상태(file://)라 로그인할 수 없어요. 웹 주소로 접속해주세요.');
+    return;
+  }
+
+  adminLoginBtn.disabled = true;
+  const originalText = adminLoginBtn.textContent;
+  adminLoginBtn.textContent = '확인 중...';
+
+  try {
+    const csv = await fetchSheetCsv(CREDENTIALS_SHEET);
+    const rows = parseCsv(csv);
+    // A1 셀(첫 행 첫 칸)에 적힌 값을 비밀번호로 취급한다
+    const storedPassword = rows[0] && rows[0][0] ? rows[0][0].trim() : '';
+
+    if (storedPassword && input === storedPassword) {
+      try { localStorage.setItem(ADMIN_SESSION_KEY, '1'); } catch (err) { /* 무시 */ }
+      adminPasswordInput.value = '';
+      adminLoginError.style.display = 'none';
+      applyAdminModeUI(true);
+      loadState(); // 관리자 전용 데이터(이 브라우저의 작업본)를 새로 불러온다
+      renderCategories();
+      renderCalendar();
+      showToast('관리자 모드로 전환했어요 🔓');
+    } else {
+      showAdminLoginError('비밀번호가 올바르지 않아요');
+      showToast('비밀번호가 올바르지 않아요');
+    }
+  } catch (err) {
+    console.error(err);
+    showAdminLoginError('계정 확인 중 오류가 발생했어요. 인터넷 연결을 확인해주세요.');
+  } finally {
+    adminLoginBtn.disabled = false;
+    adminLoginBtn.textContent = originalText;
   }
 }
 
@@ -975,7 +967,8 @@ adminLogoutBtn.addEventListener('click', () => {
    로컬 저장 (localStorage)
    - 관리자가 편집한 "작업본"만 이 브라우저에 저장한다 (일반 방문자는
      저장/복원 대상이 아니라 항상 DEFAULT_STATE를 본다).
-   - 컬러/카테고리/일정/제목/배경이미지를 하나의 JSON으로 묶어서 저장한다.
+   - 컬러/카테고리/제목/배경이미지를 하나의 JSON으로 묶어서 저장한다.
+     (일정은 여기 포함되지 않는다 — 항상 SCHEDULE_SHEET에서 실시간으로 온다)
    - 배경 이미지(Data URL)는 용량이 커서 localStorage 한도를 넘길 수 있으므로,
      실패하면 이미지만 빼고 나머지라도 저장되도록 한 번 더 시도한다.
 --------------------------------------------------------------- */
@@ -994,7 +987,6 @@ function saveState() {
     subColor: subColorInput.value,
     calTitle: calTitleInput.value,
     categories: state.categories,
-    schedules: state.schedules,
     bgImage: getCurrentBgImageUrl(),
     bgFileLabel: bgFileName.textContent,
   };
@@ -1012,12 +1004,13 @@ function saveState() {
   }
 }
 
-/* data(mainColor/subColor/calTitle/categories/schedules/bgImage)를
-   실제 입력창/state에 반영하는 공통 로직. DEFAULT_STATE를 보여줄 때와
-   localStorage에 저장된 관리자 작업본을 복원할 때 모두 이걸 재사용한다. */
+/* data(mainColor/subColor/calTitle/categories/bgImage)를 실제 입력창/state에
+   반영하는 공통 로직. DEFAULT_STATE를 보여줄 때와 localStorage에 저장된
+   관리자 작업본을 복원할 때 모두 이걸 재사용한다.
+   일정(schedules)은 여기서 다루지 않는다 — syncSchedulesFromSheet()의 몫이다. */
 function applyLoadedData(rawData) {
-  // rawData(특히 DEFAULT_STATE)의 categories/schedules를 참조 그대로 state에 물리면,
-  // 이후 일정 추가/삭제 같은 state 변형이 원본 객체까지 그대로 오염시킨다
+  // rawData(특히 DEFAULT_STATE)의 categories를 참조 그대로 state에 물리면,
+  // 이후 카테고리 추가/삭제 같은 state 변형이 원본 객체까지 그대로 오염시킨다
   // (DEFAULT_STATE는 페이지가 살아있는 동안 계속 재사용되는 공유 상수이므로 특히 위험).
   // 그래서 항상 깊은 복사본을 만들어 state에 넣는다.
   const data = structuredClone(rawData);
@@ -1034,7 +1027,6 @@ function applyLoadedData(rawData) {
   if (Array.isArray(data.categories) && data.categories.length > 0) {
     state.categories = data.categories;
   }
-  state.schedules = (data.schedules && typeof data.schedules === 'object') ? data.schedules : {};
 
   if (data.bgImage) {
     calendarCapture.style.backgroundImage = `url(${data.bgImage})`;
@@ -1153,7 +1145,6 @@ calTitleInput.addEventListener('input', () => {
 ================================================================ */
 const calMonthTitle = document.getElementById('calMonthTitle');
 const dayGrid = document.getElementById('dayGrid');
-const selectedDateBadge = document.getElementById('selectedDateBadge');
 
 function renderCalendar() {
   const { viewYear, viewMonth } = state;
@@ -1197,7 +1188,6 @@ function renderCalendar() {
     cellEl.className = 'day-cell';
     if (!cell.inMonth) cellEl.classList.add('other-month');
     if (key === todayKey) cellEl.classList.add('today');
-    if (key === state.selectedDateKey) cellEl.classList.add('selected');
     if (weekdayIdx === 0) cellEl.classList.add('sun');
     if (weekdayIdx === 6) cellEl.classList.add('sat');
     cellEl.dataset.dateKey = key;
@@ -1218,55 +1208,26 @@ function renderCalendar() {
       const resolvedBg = resolveCssColor(bgColor);
       const textColor = getContrastTextColor(resolvedBg);
 
+      // 일정은 이제 구글 시트에서만 관리하므로(읽기 전용), 태그에 삭제(✕)
+      // 버튼을 달지 않는다 — 지우고 싶으면 시트에서 그 행을 지우면 된다.
       const tagEl = document.createElement('div');
       tagEl.className = 'tag';
       tagEl.style.background = bgColor;
       tagEl.style.color = textColor;
-      tagEl.innerHTML = `
-        <span class="tag-label">${escapeHtml(sch.text)}</span>
-        <span class="tag-x" data-remove-id="${sch.id}" data-remove-key="${key}">✕</span>
-      `;
+      tagEl.innerHTML = `<span class="tag-label">${escapeHtml(sch.text)}</span>`;
       tagList.appendChild(tagEl);
     });
 
     cellEl.appendChild(tagList);
-
-    // 날짜 칸 클릭 -> 일정 등록 폼의 "선택된 날짜"로 지정
-    // (단, 태그의 ✕ 버튼 클릭은 삭제 동작이 우선되도록 아래에서 별도 처리)
-    cellEl.addEventListener('click', (e) => {
-      if (e.target.closest('.tag-x')) return; // 삭제 버튼 클릭은 무시
-      selectDate(key, cell.y, cell.m, cell.day);
-    });
-
     dayGrid.appendChild(cellEl);
-  });
-
-  // 태그 삭제(✕) 버튼 이벤트는 이벤트 위임으로 한번에 처리
-  dayGrid.querySelectorAll('.tag-x').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const key = btn.dataset.removeKey;
-      const id = btn.dataset.removeId;
-      state.schedules[key] = (state.schedules[key] || []).filter((s) => String(s.id) !== id);
-      renderCalendar();
-      saveState();
-    });
   });
 }
 
-/* XSS 방지를 위한 간단한 텍스트 이스케이프 (일정 내용은 유저 입력이므로) */
+/* XSS 방지를 위한 간단한 텍스트 이스케이프 (일정 내용은 시트에서 온 값이므로) */
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
-}
-
-/* 날짜 선택 시 좌측 폼의 안내 배지 갱신 */
-function selectDate(key, y, m, d) {
-  state.selectedDateKey = key;
-  selectedDateBadge.classList.add('active');
-  selectedDateBadge.innerHTML = `<b>${y}년 ${m + 1}월 ${d}일</b> 선택됨`;
-  renderCalendar();
 }
 
 /* ================================================================
@@ -1289,27 +1250,15 @@ document.getElementById('nextMonthBtn').addEventListener('click', () => {
      renderCategories() 가 "카테고리 select 옵션"과 "관리 목록 칩"을
      동시에 다시 그려서 항상 서로 어긋나지 않게 한다.
 ================================================================ */
-const categorySelect = document.getElementById('categorySelect');
 const categoryList = document.getElementById('categoryList');
 const newCategoryColor = document.getElementById('newCategoryColor');
 const newCategoryLabel = document.getElementById('newCategoryLabel');
 const addCategoryBtn = document.getElementById('addCategoryBtn');
 
 function renderCategories() {
-  // 1) 일정 등록 폼의 카테고리 <select> 옵션 다시 그리기 (선택값 최대한 유지)
-  const prevValue = categorySelect.value;
-  categorySelect.innerHTML = '';
-  state.categories.forEach((cat) => {
-    const opt = document.createElement('option');
-    opt.value = cat.key;
-    opt.textContent = cat.label;
-    categorySelect.appendChild(opt);
-  });
-  if (state.categories.some((c) => c.key === prevValue)) {
-    categorySelect.value = prevValue;
-  }
-
-  // 2) "카테고리 관리" 섹션의 칩 목록 다시 그리기
+  // "카테고리 관리" 섹션의 칩 목록을 다시 그린다. (카테고리 선택 <select>는
+  // 이제 없다 — 일정은 구글 시트에서 카테고리 "이름"으로 매칭되기 때문에
+  // normalizeCategory()가 state.categories의 label과 직접 비교한다.)
   categoryList.innerHTML = '';
   state.categories.forEach((cat) => {
     const chip = document.createElement('div');
@@ -1353,7 +1302,8 @@ function addCategory() {
 }
 
 function removeCategory(key) {
-  // 카테고리가 0개가 되면 일정 등록 폼 자체가 성립하지 않으므로 최소 1개는 남겨둔다
+  // 카테고리가 0개가 되면 구글 시트의 카테고리 값을 매칭할 대상 자체가
+  // 없어지므로 최소 1개는 남겨둔다
   if (state.categories.length <= 1) {
     showToast('카테고리가 최소 1개는 있어야 해요');
     return;
@@ -1361,7 +1311,8 @@ function removeCategory(key) {
   const cat = findCategory(key);
   if (!cat) return;
 
-  // 이 카테고리를 쓰던 일정 태그도 함께 정리 (고아 데이터 방지)
+  // 화면에 이미 그려져 있던 태그도 즉시 정리 (다음 시트 동기화 때
+  // 어차피 다시 채워지지만, 삭제 직후 화면이 어색하지 않도록)
   let removedCount = 0;
   Object.keys(state.schedules).forEach((dateKey) => {
     const before = state.schedules[dateKey].length;
@@ -1389,44 +1340,7 @@ newCategoryLabel.addEventListener('keydown', (e) => {
 });
 
 /* ================================================================
-   7. 일정 등록 기능
-================================================================ */
-const addScheduleBtn = document.getElementById('addScheduleBtn');
-const scheduleText = document.getElementById('scheduleText');
-
-addScheduleBtn.addEventListener('click', () => {
-  if (!state.selectedDateKey) {
-    showToast('먼저 달력에서 날짜를 클릭해주세요');
-    return;
-  }
-  const text = scheduleText.value.trim();
-  if (!text) {
-    showToast('일정 내용을 입력해주세요');
-    return;
-  }
-
-  const key = state.selectedDateKey;
-  if (!state.schedules[key]) state.schedules[key] = [];
-
-  state.schedules[key].push({
-    id: Date.now(), // 삭제 시 구분용 고유 id
-    category: categorySelect.value,
-    text,
-  });
-
-  scheduleText.value = '';
-  renderCalendar();
-  saveState();
-  showToast('일정이 추가되었습니다 🎉');
-});
-
-// 입력창에서 Enter 키로도 바로 등록되도록 처리
-scheduleText.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') addScheduleBtn.click();
-});
-
-/* ================================================================
-   8. 완성된 캘린더 PNG로 다운로드 (html2canvas)
+   7. 완성된 캘린더 PNG로 다운로드 (html2canvas)
    - 캡처 대상은 오직 #calendar-capture 하나 뿐이라
      좌측 제어판은 결과 이미지에 포함되지 않는다.
    - scale:2 로 캡처 해상도를 2배로 높여서 폰/커뮤니티 공유용으로도
@@ -1463,26 +1377,12 @@ downloadBtn.addEventListener('click', async () => {
 });
 
 /* ================================================================
-   9. 구글 스프레드시트에서 일정 불러오기
-   - 사용자가 붙여넣은 시트 "탭" URL에서 스프레드시트 ID와 gid(탭 번호)를
-     정규식으로 추출한 뒤, 구글이 제공하는 CSV 내보내기 엔드포인트로
-     fetch 한다. (시트가 "링크가 있으면 볼 수 있음"으로 공유되어 있어야
-     브라우저에서 별도 인증 없이 바로 읽힌다.)
+   9. 구글 스프레드시트에서 일정 자동 동기화
+   - SCHEDULE_SHEET(고정된 시트/탭)를 구글이 제공하는 CSV 내보내기
+     엔드포인트로 fetch 한다. 시트가 "링크가 있으면 볼 수 있음"으로
+     공유되어 있어야 브라우저에서 별도 인증 없이 바로 읽힌다.
    - 시트 형식: A열=날짜(YYYY-MM-DD 등), B열=카테고리, C열=내용, 헤더행 1개.
-   - 재불러오기 시 이전에 시트에서 가져온 항목만 지우고 새로 채워서,
-     사용자가 툴에서 직접 추가한 일정은 그대로 유지되게 한다.
 ================================================================ */
-const sheetUrlInput = document.getElementById('sheetUrlInput');
-const loadSheetBtn = document.getElementById('loadSheetBtn');
-const sheetStatus = document.getElementById('sheetStatus');
-
-/* 시트 URL에서 { id, gid } 추출. 형식이 안 맞으면 null 반환 */
-function parseSheetUrl(url) {
-  const idMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-  if (!idMatch) return null;
-  const gidMatch = url.match(/[#&?]gid=(\d+)/);
-  return { id: idMatch[1], gid: gidMatch ? gidMatch[1] : '0' };
-}
 
 /* 따옴표로 감싼 콤마/줄바꿈까지 처리하는 간단한 CSV 파서 */
 function parseCsv(text) {
@@ -1543,49 +1443,49 @@ function normalizeCategory(raw) {
   return null;
 }
 
-async function loadFromGoogleSheet() {
-  const url = sheetUrlInput.value.trim();
-  const parsed = url ? parseSheetUrl(url) : null;
+const publicSyncIndicator = document.getElementById('publicSyncIndicator');
+const manualSyncBtn = document.getElementById('manualSyncBtn');
+const manualSyncBtnAdmin = document.getElementById('manualSyncBtnAdmin');
 
-  if (!parsed) {
-    showToast('올바른 구글 시트 URL을 붙여넣어주세요');
-    return;
-  }
+function formatNowKST() {
+  return new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
 
-  // 이 HTML 파일을 더블클릭해서 file:// 로 직접 연 경우, 브라우저가 보안상
-  // 외부 서버로의 요청 자체를 막아버려서 구글 시트를 절대 불러올 수 없다.
-  // (fetch가 "Failed to fetch"로 실패하는데, 원인이 CORS/네트워크 에러와
-  //  똑같이 보여서 그냥 두면 "시트 공유 설정이 잘못됐나?" 하고 오해하기 쉽다.
-  //  그래서 아예 시도하기 전에 걸러서 정확한 원인을 안내한다.)
+function setSyncSpinning(isSpinning) {
+  [manualSyncBtn, manualSyncBtnAdmin].forEach((btn) => {
+    if (!btn) return;
+    btn.disabled = isSpinning;
+    btn.classList.toggle('spinning', isSpinning);
+  });
+}
+
+/* 방문자(관리자 여부 무관) 모두에게 보이는 동기화 상태 문구를 갱신 */
+function setSyncStatusText(text) {
+  if (publicSyncIndicator) publicSyncIndicator.textContent = `🔄 ${text}`;
+}
+
+/* 구글 시트(SCHEDULE_SHEET)를 읽어서 state.schedules를 통째로 새로 채운다.
+   - 페이지를 열 때 관리자/일반 방문자 구분 없이 항상 자동으로 실행되고,
+     새로고침 버튼으로 아무 때나 다시 실행할 수 있다.
+   - 시트가 곧 유일한 데이터 소스이므로, 이 페이지 자체에서 일정을 추가/
+     삭제하는 기능은 없다 (있었다면 다음 동기화 때 그냥 덮어써질 것이다). */
+async function syncSchedulesFromSheet() {
+  // file:// 로 직접 연 경우 브라우저가 외부 요청 자체를 막아버려서
+  // 절대 성공할 수 없다. fetch의 "Failed to fetch" 에러는 원인이 잘
+  // 안 드러나므로, 미리 걸러서 정확한 이유를 안내한다.
   if (location.protocol === 'file:') {
-    sheetStatus.className = 'sheet-status error';
-    sheetStatus.textContent =
-      '이 기능은 파일을 더블클릭해서 열었을 때는 브라우저 보안 정책상 동작하지 않아요. ' +
-      'GitHub Pages/Netlify 같은 곳에 올려서 그 웹 주소로 접속했을 때만 사용할 수 있어요.';
-    showToast('구글 시트 불러오기는 웹 주소(http/https)로 열었을 때만 동작해요');
+    setSyncStatusText('file://로 열려 있어 동기화가 안 돼요. 웹 주소로 접속해주세요.');
     return;
   }
 
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${parsed.id}/export?format=csv&gid=${parsed.gid}`;
-
-  loadSheetBtn.disabled = true;
-  const originalText = loadSheetBtn.textContent;
-  loadSheetBtn.textContent = '불러오는 중...';
-  sheetStatus.className = 'sheet-status';
-  sheetStatus.textContent = '';
+  setSyncSpinning(true);
+  setSyncStatusText('동기화 중...');
 
   try {
-    const res = await fetch(csvUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const csvText = await res.text();
-    const rows = parseCsv(csvText);
+    const csv = await fetchSheetCsv(SCHEDULE_SHEET);
+    const rows = parseCsv(csv);
 
-    // 이전에 시트에서 불러온 항목만 제거 (수동으로 추가한 일정은 보존)
-    Object.keys(state.schedules).forEach((key) => {
-      state.schedules[key] = (state.schedules[key] || []).filter((s) => s.source !== 'sheet');
-      if (state.schedules[key].length === 0) delete state.schedules[key];
-    });
-
+    const newSchedules = {};
     let importedCount = 0;
     rows.forEach((row, idx) => {
       const dateKey = normalizeDate(row[0]);
@@ -1593,48 +1493,24 @@ async function loadFromGoogleSheet() {
       const text = (row[2] || '').trim();
       if (!dateKey || !category || !text) return; // 헤더행/빈값/형식오류는 건너뜀
 
-      if (!state.schedules[dateKey]) state.schedules[dateKey] = [];
-      state.schedules[dateKey].push({
-        id: `sheet-${idx}-${dateKey}`,
-        category,
-        text,
-        source: 'sheet',
-      });
+      if (!newSchedules[dateKey]) newSchedules[dateKey] = [];
+      newSchedules[dateKey].push({ id: `sheet-${idx}-${dateKey}`, category, text });
       importedCount += 1;
     });
 
+    state.schedules = newSchedules;
     renderCalendar();
-    saveState();
-
-    if (importedCount === 0) {
-      sheetStatus.classList.add('error');
-      sheetStatus.textContent = '읽을 수 있는 일정이 없어요. 열 형식(날짜/카테고리/내용)을 확인해주세요.';
-    } else {
-      sheetStatus.classList.add('success');
-      sheetStatus.textContent = `마지막 동기화 완료 · ${importedCount}개 일정 불러옴`;
-      showToast(`시트에서 ${importedCount}개 일정을 불러왔어요 📥`);
-    }
+    setSyncStatusText(`마지막 동기화: ${formatNowKST()} · 일정 ${importedCount}개`);
   } catch (err) {
     console.error(err);
-    sheetStatus.classList.add('error');
-    sheetStatus.textContent =
-      '불러오기 실패 — 시트가 "링크가 있으면 볼 수 있음"으로 공유되어 있는지, 인터넷 연결이 되어 있는지 확인해주세요.';
-    showToast('구글 시트 불러오기에 실패했어요');
+    setSyncStatusText('동기화 실패 — 인터넷 연결을 확인하거나 잠시 후 다시 시도해주세요');
   } finally {
-    loadSheetBtn.disabled = false;
-    loadSheetBtn.textContent = originalText;
+    setSyncSpinning(false);
   }
 }
 
-loadSheetBtn.addEventListener('click', loadFromGoogleSheet);
-sheetUrlInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') loadFromGoogleSheet();
-});
-
-// 파일을 더블클릭(file://)으로 연 상태라면, 버튼을 눌러보기 전에 미리 경고를 띄운다
-if (location.protocol === 'file:') {
-  document.getElementById('sheetFileWarning').style.display = 'block';
-}
+if (manualSyncBtn) manualSyncBtn.addEventListener('click', syncSchedulesFromSheet);
+if (manualSyncBtnAdmin) manualSyncBtnAdmin.addEventListener('click', syncSchedulesFromSheet);
 
 /* ================================================================
    9. 배포용 설정 내보내기
@@ -1651,7 +1527,6 @@ exportConfigBtn.addEventListener('click', async () => {
     subColor: subColorInput.value,
     calTitle: calTitleInput.value,
     categories: state.categories,
-    schedules: state.schedules,
     bgImage: getCurrentBgImageUrl(),
     bgFileLabel: bgFileName.textContent,
   };
@@ -1676,14 +1551,17 @@ exportConfigBtn.addEventListener('click', async () => {
 
 /* ================================================================
    초기 실행
-   - initAdminModeUI()로 관리자 잠금 상태를 먼저 화면에 반영한 뒤,
-     loadState()가 그 상태에 맞는 데이터(방문자=배포 기본값 /
-     관리자=이 브라우저의 작업본)를 불러와 채운다.
+   - applyAdminModeUI()로 관리자 잠금 상태를 먼저 화면에 반영한 뒤,
+     loadState()가 그 상태에 맞는 색상/카테고리/제목/배경(방문자=배포
+     기본값 / 관리자=이 브라우저의 작업본)을 불러와 채운다.
+   - 일정만은 별도로, 누구에게나 항상 syncSchedulesFromSheet()가
+     구글 시트에서 실시간으로 읽어온다.
 ================================================================ */
 applyAdminModeUI(isAdminUnlocked());
 loadState();
 renderCategories();
 renderCalendar();
+syncSchedulesFromSheet();
 </script>
 </body>
 </html>
