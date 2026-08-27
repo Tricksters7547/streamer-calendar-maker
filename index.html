@@ -292,7 +292,7 @@
   }
 
   .title-input-wrap {
-    width: min(720px, 92%);
+    width: min(980px, 96%);
   }
   .cal-title-input {
     width: 100%;
@@ -311,8 +311,8 @@
         그 위에 반투명 그리드가 얹히는 구조 */
   #calendar-capture {
     position: relative;
-    width: min(720px, 92%);
-    aspect-ratio: 3 / 4;
+    width: min(980px, 96%);
+    aspect-ratio: 4 / 3;
     border-radius: var(--radius-lg);
     border: 3px solid var(--main-color);
     box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 30px 60px -20px rgba(0,0,0,0.6), 0 0 40px -10px var(--main-color);
@@ -346,14 +346,14 @@
   }
   .cal-header .title-block h2 {
     margin: 0;
-    font-size: 20px;
+    font-size: 25px;
     letter-spacing: -0.02em;
     color: var(--text-main);
     text-shadow: 0 2px 10px rgba(0,0,0,0.5);
   }
   .cal-header .title-block p {
     margin: 3px 0 0;
-    font-size: 12px;
+    font-size: 13.5px;
     color: var(--sub-color);
     font-weight: 600;
     text-shadow: 0 2px 8px rgba(0,0,0,0.5);
@@ -384,7 +384,7 @@
   }
   .weekday-row span {
     text-align: center;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     color: rgba(255,255,255,0.65);
     text-shadow: 0 1px 6px rgba(0,0,0,0.5);
@@ -425,7 +425,7 @@
   }
 
   .day-num {
-    font-size: 11.5px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--text-main);
     text-shadow: 0 1px 4px rgba(0,0,0,0.5);
@@ -444,11 +444,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 3px;
-    font-size: 8.8px;
+    gap: 4px;
+    font-size: 10.5px;
     font-weight: 700;
     color: #14141f;
-    padding: 2px 5px;
+    padding: 3px 7px;
     border-radius: 20px;
     line-height: 1.4;
     white-space: nowrap;
@@ -458,9 +458,20 @@
   /* 태그 배경/글자색은 카테고리마다 다르므로 JS에서 인라인 스타일로 지정한다
      (배경색 대비를 계산해 글자색을 자동으로 흰색/검은색 중 고른다) */
 
+  /* 태그 삭제(✕) 버튼 : 관리자 모드일 때만 JS가 붙여준다 */
+  .tag .tag-delete {
+    flex-shrink: 0;
+    cursor: pointer;
+    opacity: 0.65;
+    font-size: 10px;
+    line-height: 1;
+    margin-left: 2px;
+  }
+  .tag .tag-delete:hover { opacity: 1; }
+
   /* ---------- 다운로드 버튼 ---------- */
   .download-btn {
-    width: min(720px, 92%);
+    width: min(980px, 96%);
     padding: 15px;
     border: none;
     border-radius: var(--radius-md);
@@ -1122,13 +1133,26 @@ function renderCalendar() {
       const resolvedBg = resolveCssColor(bgColor);
       const textColor = getContrastTextColor(resolvedBg);
 
-      // 일정은 이제 구글 시트에서만 관리하므로(읽기 전용), 태그에 삭제(✕)
-      // 버튼을 달지 않는다 — 지우고 싶으면 시트에서 그 행을 지우면 된다.
+      // 일정은 구글 시트가 원본이라, 태그 삭제는 곧 "시트에서 그 행을 지우는 것"과
+      // 같다. 관리자 모드일 때만 ✕ 버튼을 달아서, 일반 방문자는 건드릴 수 없게 한다.
       const tagEl = document.createElement('div');
       tagEl.className = 'tag';
       tagEl.style.background = bgColor;
       tagEl.style.color = textColor;
       tagEl.innerHTML = `<span class="tag-label">${escapeHtml(sch.text)}</span>`;
+
+      if (isAdminUnlocked()) {
+        const deleteBtn = document.createElement('span');
+        deleteBtn.className = 'tag-delete';
+        deleteBtn.textContent = '✕';
+        deleteBtn.title = '이 일정을 시트에서 삭제';
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteScheduleFromSheet(sch, key);
+        });
+        tagEl.appendChild(deleteBtn);
+      }
+
       tagList.appendChild(tagEl);
     });
 
@@ -1422,7 +1446,16 @@ async function syncSchedulesFromSheet() {
       if (!dateKey || !category || !text) return; // 헤더행/빈값/형식오류는 건너뜀
 
       if (!newSchedules[dateKey]) newSchedules[dateKey] = [];
-      newSchedules[dateKey].push({ id: `sheet-${idx}-${dateKey}`, category, text });
+      newSchedules[dateKey].push({
+        id: `sheet-${idx}-${dateKey}`,
+        category,
+        text,
+        // 삭제 요청 시 시트의 실제 셀 값과 정확히 대조하기 위해 원본 텍스트도 같이 들고 있는다
+        // (행 번호로 지우면 중간에 빈 행이 끼어있을 때 엉뚱한 행이 지워질 수 있어서,
+        //  대신 Apps Script가 이 값들로 직접 검색해서 지우게 한다)
+        rawDate: (row[0] || '').trim(),
+        rawCategory: (row[1] || '').trim(),
+      });
       importedCount += 1;
     });
 
@@ -1490,6 +1523,35 @@ if (addScheduleToSheetBtn) {
       addScheduleToSheetBtn.textContent = originalText;
     }
   });
+}
+
+/* 캘린더 우측 미리보기에서 태그의 ✕를 눌렀을 때 호출된다.
+   행 번호가 아니라 (날짜, 카테고리 원문, 내용)로 시트에서 직접 찾아 지우게
+   하는 이유는 렌더링 노트 참고 — 중간에 빈 행이 있어도 안전하다. */
+async function deleteScheduleFromSheet(sch, dateKey) {
+  showToast('일정을 삭제하는 중...');
+  try {
+    await writeToSheet('deleteSchedule', {
+      date: sch.rawDate,
+      category: sch.rawCategory,
+      text: sch.text,
+    });
+    await syncSchedulesFromSheet();
+
+    const stillThere = (state.schedules[dateKey] || []).some(
+      (s) => s.text === sch.text && s.rawDate === sch.rawDate && s.rawCategory === sch.rawCategory
+    );
+    if (stillThere) throw new Error('DELETE_NOT_VERIFIED');
+
+    showToast('일정을 삭제했어요 🗑️');
+  } catch (err) {
+    console.error(err);
+    showToast(
+      err.message === 'APPS_SCRIPT_NOT_CONFIGURED' ? 'Apps Script 연동이 아직 설정되지 않았어요 (Claude에게 문의해주세요)'
+      : err.message === 'DELETE_NOT_VERIFIED' ? '삭제가 반영되지 않았어요 — 로그아웃 후 다시 로그인해서 시도해주세요'
+      : '삭제 실패 — 인터넷 연결과 Apps Script 배포 상태를 확인해주세요'
+    );
+  }
 }
 
 const previewMainColor = document.getElementById('previewMainColor');
