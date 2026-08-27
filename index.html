@@ -137,9 +137,7 @@
     margin-bottom: 7px;
   }
 
-  /* 컬러피커 2개를 나란히 배치 */
-  .color-row { display: flex; gap: 12px; }
-  .color-field { flex: 1; }
+  /* 카테고리 추가 폼의 컬러피커 (input[type=color]는 여기서만 쓰인다) */
   input[type="color"] {
     -webkit-appearance: none;
     appearance: none;
@@ -153,45 +151,6 @@
   }
   input[type="color"]::-webkit-color-swatch-wrapper { padding: 4px; }
   input[type="color"]::-webkit-color-swatch { border: none; border-radius: 7px; }
-
-  /* 이미지 업로드 : 실제 input은 숨기고 라벨을 버튼처럼 스타일링 */
-  .upload-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    padding: 12px;
-    border: 1.5px dashed var(--line);
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-dim);
-    font-size: 13px;
-    cursor: pointer;
-    transition: 0.15s;
-  }
-  .upload-btn:hover {
-    border-color: var(--main-color);
-    color: var(--text-main);
-  }
-  .upload-btn input[type="file"] { display: none; }
-  #bgFileName {
-    margin-top: 8px;
-    font-size: 11.5px;
-    color: var(--main-color);
-    word-break: break-all;
-  }
-  .reset-bg-btn {
-    margin-top: 8px;
-    font-size: 11.5px;
-    color: var(--text-dim);
-    background: none;
-    border: none;
-    text-decoration: underline;
-    cursor: pointer;
-    padding: 0;
-    display: none; /* 배경이 업로드된 경우에만 JS가 보여줌 */
-  }
 
   /* 공통 텍스트 입력 / 셀렉트 스타일 */
   input[type="text"], select {
@@ -303,6 +262,12 @@
     margin: 0 0 14px;
   }
   .sheet-help b { color: var(--text-main); }
+  .sheet-help code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text-main);
+  }
 
   .sheet-status {
     margin-top: 10px;
@@ -593,7 +558,7 @@
 
         <div id="adminLockedView">
           <p class="sheet-help">
-            색상 · 배경 · 카테고리를 편집하려면 관리자 비밀번호를 입력하세요.
+            카테고리를 편집하거나 시트 연동 상태를 관리하려면 관리자 비밀번호를 입력하세요.
             일반 방문자는 완성된 캘린더 보기와 PNG 저장만 가능해요.
           </p>
           <div class="field">
@@ -617,45 +582,26 @@
       <!-- 편집 패널 전체. 관리자 로그인 전에는 완전히 숨겨져 있다 -->
       <div id="adminPanel" style="display:none;">
 
-      <!-- 1. 컬러 커스텀 -->
+      <!-- 1. 설정 데이터 : 테마 컬러 / 배경 이미지 / 캘린더 제목도 이제
+           구글 시트에서 자동으로 반영된다 (일정과 같은 원리). -->
       <section class="section">
-        <div class="section-title"><span class="num">1</span> 테마 컬러 설정</div>
-        <div class="color-row">
-          <div class="color-field">
-            <label for="mainColorInput">메인 컬러 (포인트)</label>
-            <input type="color" id="mainColorInput" value="#b98cf9" />
-          </div>
-          <div class="color-field">
-            <label for="subColorInput">서브 컬러</label>
-            <input type="color" id="subColorInput" value="#ff8fc7" />
-          </div>
-        </div>
+        <div class="section-title"><span class="num">1</span> 설정 데이터</div>
+        <p class="sheet-help">
+          테마 컬러 · 배경 이미지 · 캘린더 제목은 연결된 구글 시트에서
+          <b>모든 방문자에게 자동으로</b> 반영돼요. 바꾸고 싶으면 이 페이지가
+          아니라 <b>시트를 직접 편집</b>하면 됩니다.
+        </p>
+        <p class="sheet-help">
+          열 구성(1행 헤더 + 2행 값): <b>메인컬러 · 서브컬러 · 캘린더제목 · 배경이미지URL</b>.
+          컬러는 <code>#rrggbb</code> 형식, 배경이미지URL은 Imgur 등에 올린 이미지의
+          직접 링크를 넣어주세요 (네이버 블로그/카페 이미지는 외부에서 막혀 있어 동작하지 않아요).
+        </p>
+        <button type="button" class="add-btn" id="manualSettingsSyncBtn">🔄 지금 다시 불러오기</button>
       </section>
 
-      <!-- 2. 배경 이미지 커스텀 -->
+      <!-- 2. 카테고리 관리 -->
       <section class="section">
-        <div class="section-title"><span class="num">2</span> 배경 이미지</div>
-        <div class="field">
-          <label class="upload-btn" for="bgImageInput">
-            🖼️ 스트리머 일러스트 / 배경 업로드
-            <input type="file" id="bgImageInput" accept=".png,.jpg,.jpeg,image/png,image/jpeg" />
-          </label>
-          <div id="bgFileName"></div>
-          <button type="button" class="reset-bg-btn" id="resetBgBtn">배경 이미지 제거</button>
-        </div>
-      </section>
-
-      <!-- 3. 캘린더 제목 -->
-      <section class="section">
-        <div class="section-title"><span class="num">3</span> 캘린더 제목</div>
-        <div class="field">
-          <input type="text" id="calTitleInput" placeholder="예: 다은이의 8월 방송표" maxlength="30" />
-        </div>
-      </section>
-
-      <!-- 4. 카테고리 관리 -->
-      <section class="section">
-        <div class="section-title"><span class="num">4</span> 카테고리 관리</div>
+        <div class="section-title"><span class="num">2</span> 카테고리 관리</div>
 
         <!-- 현재 카테고리 목록. JS의 renderCategories()가 매번 새로 그린다 -->
         <div class="category-list" id="categoryList"></div>
@@ -672,7 +618,7 @@
            읽어와서 캘린더에 반영하므로, 일정을 바꾸고 싶으면 시트만 고치면
            되고 배포/Claude 요청이 필요 없다. -->
       <section class="section">
-        <div class="section-title"><span class="num">5</span> 일정 데이터</div>
+        <div class="section-title"><span class="num">3</span> 일정 데이터</div>
         <p class="sheet-help">
           일정은 연결된 구글 시트에서 <b>모든 방문자에게 자동으로</b> 반영돼요.
           추가·수정·삭제는 이 페이지가 아니라 <b>시트를 직접 편집</b>해서 하면 됩니다.
@@ -684,14 +630,14 @@
         <button type="button" class="add-btn" id="manualSyncBtnAdmin">🔄 지금 다시 불러오기</button>
       </section>
 
-      <!-- 6. 배포용 설정 내보내기 (색상 · 배경 · 제목 · 카테고리 목록에만 해당.
-           일정 데이터는 위 5번 시트가 대신하므로 여기서 다루지 않는다) -->
+      <!-- 4. 배포용 설정 내보내기 (카테고리 목록에만 해당.
+           컬러/배경/제목/일정은 이제 전부 구글 시트가 대신하므로 여기서 다루지 않는다) -->
       <section class="section">
-        <div class="section-title"><span class="num">6</span> 다른 사람에게도 보이게 하기</div>
+        <div class="section-title"><span class="num">4</span> 다른 사람에게도 보이게 하기</div>
         <p class="sheet-help">
-          색상 · 배경 이미지 · 캘린더 제목 · 카테고리 목록은 이 브라우저에만 저장돼요
-          (일정은 5번 시트가 이미 모두에게 자동으로 보여줍니다).
-          이 항목들도 다른 방문자에게 반영하려면, 아래 버튼으로 복사해서
+          카테고리 목록만 이 브라우저에 저장돼요 (컬러·배경·제목·일정은
+          이미 구글 시트가 모두에게 자동으로 보여줍니다).
+          카테고리 변경도 다른 방문자에게 반영하려면, 아래 버튼으로 복사해서
           Claude 대화창에 붙여넣어 "배포해줘"라고 요청해주세요.
         </p>
         <button type="button" class="add-btn" id="exportConfigBtn">📤 설정 복사하기 (배포 요청용)</button>
@@ -818,28 +764,19 @@ function showToast(message) {
 }
 
 /* ---------------------------------------------------------------
-   배포된 기본값 (DEFAULT_STATE)
-   - 이 페이지는 서버/DB가 없는 정적 파일이라, 방문자마다 서로 다른
-     localStorage를 갖는다 -> 그대로 두면 관리자가 등록한 일정을
-     "다른 사람은 못 보는" 문제가 생긴다.
-   - 그래서 "지금 모두에게 보이는 상태"를 이 상수에 그대로 박아둔다.
-     관리자가 아닌 일반 방문자는 항상 이 값을 그대로 보게 되고,
-     관리자가 설정을 바꾸고 "배포"를 요청하면(7번 섹션) 이 상수 값을
-     새로 고쳐서 다시 배포한다.
+   배포된 기본 카테고리 목록 (DEFAULT_STATE)
+   - 컬러/배경/제목/일정은 이제 전부 SETTINGS_SHEET / SCHEDULE_SHEET에서
+     실시간으로 오기 때문에, 이 상수에는 카테고리만 남는다.
+   - 일반 방문자는 항상 이 기본 카테고리 목록을 보고, 관리자가 카테고리를
+     바꾸고 "배포"를 요청하면(4번 섹션) 이 값을 고쳐서 다시 배포한다.
 --------------------------------------------------------------- */
 const DEFAULT_STATE = {
-  mainColor: '#b98cf9',
-  subColor: '#ff8fc7',
-  calTitle: '',
   categories: [
     { key: 'start',   label: '방송시작', color: 'var(--main-color)' },
     { key: 'off',     label: '휴방',     color: '#9a9aa5' },
     { key: 'collab',  label: '합방',     color: 'var(--sub-color)' },
     { key: 'youtube', label: '유튜브',   color: '#ff5b5b' },
   ],
-  // schedules는 여기 없다 — 일정은 항상 아래 SCHEDULE_SHEET를 실시간으로 읽어서 채운다.
-  bgImage: null,
-  bgFileLabel: '',
 };
 
 /* ---------------------------------------------------------------
@@ -849,7 +786,10 @@ const DEFAULT_STATE = {
      자유롭게 바꿀 수 있고, 그 변경은 코드 수정이나 재배포 없이
      방문자가 새로고침하는 즉시 반영된다.
 --------------------------------------------------------------- */
-const CREDENTIALS_SHEET = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1577649692' };
+// 설정(컬러/배경/제목)과 관리자 비밀번호는 같은 탭의 같은 행에 함께 들어있다:
+// 메인컬러, 서브컬러, 캘린더제목, 배경이미지URL, 관리자비밀번호 (1행은 헤더)
+const SETTINGS_SHEET    = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1577649692' };
+const CREDENTIALS_SHEET = SETTINGS_SHEET;
 const SCHEDULE_SHEET    = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1998787329' };
 
 function sheetCsvUrl(sheet) {
@@ -924,8 +864,9 @@ async function tryAdminLogin() {
   try {
     const csv = await fetchSheetCsv(CREDENTIALS_SHEET);
     const rows = parseCsv(csv);
-    // A1 셀(첫 행 첫 칸)에 적힌 값을 비밀번호로 취급한다
-    const storedPassword = rows[0] && rows[0][0] ? rows[0][0].trim() : '';
+    // 데이터 행(2행, index 1)의 5번째 칸(index 4) = 관리자비밀번호
+    const dataRow = rows[1] || [];
+    const storedPassword = dataRow[4] ? dataRow[4].trim() : '';
 
     if (storedPassword && input === storedPassword) {
       try { localStorage.setItem(ADMIN_SESSION_KEY, '1'); } catch (err) { /* 무시 */ }
@@ -965,85 +906,25 @@ adminLogoutBtn.addEventListener('click', () => {
 
 /* ---------------------------------------------------------------
    로컬 저장 (localStorage)
-   - 관리자가 편집한 "작업본"만 이 브라우저에 저장한다 (일반 방문자는
-     저장/복원 대상이 아니라 항상 DEFAULT_STATE를 본다).
-   - 컬러/카테고리/제목/배경이미지를 하나의 JSON으로 묶어서 저장한다.
-     (일정은 여기 포함되지 않는다 — 항상 SCHEDULE_SHEET에서 실시간으로 온다)
-   - 배경 이미지(Data URL)는 용량이 커서 localStorage 한도를 넘길 수 있으므로,
-     실패하면 이미지만 빼고 나머지라도 저장되도록 한 번 더 시도한다.
+   - 컬러/배경/제목/일정은 전부 구글 시트에서 오므로 여기서 다루지 않는다.
+   - 이제 이 브라우저에 저장하는 건 관리자가 편집한 "카테고리 작업본"
+     하나뿐이다 (일반 방문자는 저장/복원 대상이 아니라 항상
+     DEFAULT_STATE.categories를 본다).
 --------------------------------------------------------------- */
 const STORAGE_KEY = 'streamerCalendarMaker.v1';
 
-function getCurrentBgImageUrl() {
-  const bg = calendarCapture.style.backgroundImage;
-  if (!bg || bg === 'none') return null;
-  const match = bg.match(/^url\(["']?(.*?)["']?\)$/);
-  return match ? match[1] : null;
-}
-
 function saveState() {
-  const payload = {
-    mainColor: mainColorInput.value,
-    subColor: subColorInput.value,
-    calTitle: calTitleInput.value,
-    categories: state.categories,
-    bgImage: getCurrentBgImageUrl(),
-    bgFileLabel: bgFileName.textContent,
-  };
-
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ categories: state.categories }));
   } catch (err) {
-    // 대부분 배경 이미지가 너무 커서 저장 용량(약 5MB)을 넘긴 경우
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...payload, bgImage: null, bgFileLabel: '' }));
-      showToast('배경 이미지가 너무 커서 저장에서 제외했어요 (나머지 설정은 저장됨)');
-    } catch (err2) {
-      console.error('저장 실패:', err2);
-    }
-  }
-}
-
-/* data(mainColor/subColor/calTitle/categories/bgImage)를 실제 입력창/state에
-   반영하는 공통 로직. DEFAULT_STATE를 보여줄 때와 localStorage에 저장된
-   관리자 작업본을 복원할 때 모두 이걸 재사용한다.
-   일정(schedules)은 여기서 다루지 않는다 — syncSchedulesFromSheet()의 몫이다. */
-function applyLoadedData(rawData) {
-  // rawData(특히 DEFAULT_STATE)의 categories를 참조 그대로 state에 물리면,
-  // 이후 카테고리 추가/삭제 같은 state 변형이 원본 객체까지 그대로 오염시킨다
-  // (DEFAULT_STATE는 페이지가 살아있는 동안 계속 재사용되는 공유 상수이므로 특히 위험).
-  // 그래서 항상 깊은 복사본을 만들어 state에 넣는다.
-  const data = structuredClone(rawData);
-
-  if (data.mainColor) mainColorInput.value = data.mainColor;
-  if (data.subColor) subColorInput.value = data.subColor;
-  applyThemeColors();
-
-  if (typeof data.calTitle === 'string') {
-    calTitleInput.value = data.calTitle;
-    calSubTitle.textContent = data.calTitle.trim() || 'MY STREAMING CALENDAR';
-  }
-
-  if (Array.isArray(data.categories) && data.categories.length > 0) {
-    state.categories = data.categories;
-  }
-
-  if (data.bgImage) {
-    calendarCapture.style.backgroundImage = `url(${data.bgImage})`;
-    bgFileName.textContent = data.bgFileLabel || '저장된 배경 이미지 적용됨';
-    resetBgBtn.style.display = 'inline-block';
-  } else {
-    calendarCapture.style.backgroundImage = 'none';
-    bgFileName.textContent = '';
-    resetBgBtn.style.display = 'none';
+    console.error('저장 실패:', err);
   }
 }
 
 function loadState() {
-  // 일반 방문자(관리자 아님) : 항상 배포된 기본값(DEFAULT_STATE)을 그대로 본다.
-  // 이렇게 해야 관리자가 등록한 일정/컬러/배경이 "다른 사람에게도" 보인다.
+  // 일반 방문자(관리자 아님) : 항상 배포된 기본 카테고리 목록을 그대로 본다.
   if (!isAdminUnlocked()) {
-    applyLoadedData(DEFAULT_STATE);
+    state.categories = structuredClone(DEFAULT_STATE.categories);
     return;
   }
 
@@ -1065,80 +946,27 @@ function loadState() {
     }
   }
 
-  if (saved) {
-    applyLoadedData(saved);
-    showToast('저장된 작업본을 불러왔어요 💾');
+  if (saved && Array.isArray(saved.categories) && saved.categories.length > 0) {
+    state.categories = structuredClone(saved.categories);
+    showToast('저장된 카테고리 작업본을 불러왔어요 💾');
   } else {
-    applyLoadedData(DEFAULT_STATE);
+    state.categories = structuredClone(DEFAULT_STATE.categories);
   }
 }
 
 /* ================================================================
-   1. 테마 컬러 실시간 반영
-   - input[type=color] 의 값이 바뀔 때마다 CSS 변수(--main-color 등)를
-     document.documentElement 에 직접 세팅한다.
+   1. 테마 컬러 / 배경 / 제목 — 이제 전부 SETTINGS_SHEET에서 온다
    - CSS 쪽에서 이미 모든 색상을 var(--main-color)/var(--sub-color) 로
-     참조하고 있기 때문에, 이 한 줄만으로 테두리/오늘날짜/폰트/태그
-     색상이 전부 동시에 실시간으로 바뀐다.
+     참조하고 있기 때문에, CSS 변수만 갱신하면 테두리/오늘날짜/폰트/태그
+     색상이 전부 동시에 바뀐다.
 ================================================================ */
-const mainColorInput = document.getElementById('mainColorInput');
-const subColorInput = document.getElementById('subColorInput');
-
-function applyThemeColors() {
-  document.documentElement.style.setProperty('--main-color', mainColorInput.value);
-  document.documentElement.style.setProperty('--sub-color', subColorInput.value);
-}
-mainColorInput.addEventListener('input', () => { applyThemeColors(); saveState(); });
-subColorInput.addEventListener('input', () => { applyThemeColors(); saveState(); });
-
-/* ================================================================
-   2. 배경 이미지 업로드 (FileReader -> background-image)
-================================================================ */
-const bgImageInput = document.getElementById('bgImageInput');
-const bgFileName = document.getElementById('bgFileName');
-const resetBgBtn = document.getElementById('resetBgBtn');
 const calendarCapture = document.getElementById('calendar-capture');
-
-bgImageInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  // 이미지 파일인지 간단히 확인
-  if (!file.type.startsWith('image/')) {
-    showToast('이미지 파일(.png, .jpg)만 업로드할 수 있어요');
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    // FileReader가 만들어준 Data URL을 그대로 배경 이미지로 사용
-    // -> 서버 업로드 없이 브라우저 안에서만 완전히 처리됨
-    calendarCapture.style.backgroundImage = `url(${event.target.result})`;
-    bgFileName.textContent = `적용됨: ${file.name}`;
-    resetBgBtn.style.display = 'inline-block';
-    saveState();
-  };
-  reader.readAsDataURL(file);
-});
-
-resetBgBtn.addEventListener('click', () => {
-  calendarCapture.style.backgroundImage = 'none';
-  bgFileName.textContent = '';
-  bgImageInput.value = '';
-  resetBgBtn.style.display = 'none';
-  saveState();
-});
-
-/* ================================================================
-   3. 캘린더 제목 실시간 반영
-================================================================ */
-const calTitleInput = document.getElementById('calTitleInput');
 const calSubTitle = document.getElementById('calSubTitle');
 
-calTitleInput.addEventListener('input', () => {
-  calSubTitle.textContent = calTitleInput.value.trim() || 'MY STREAMING CALENDAR';
-  saveState();
-});
+function applyThemeColors(mainColor, subColor) {
+  if (mainColor) document.documentElement.style.setProperty('--main-color', mainColor);
+  if (subColor) document.documentElement.style.setProperty('--sub-color', subColor);
+}
 
 /* ================================================================
    4. 캘린더 렌더링
@@ -1361,7 +1189,7 @@ downloadBtn.addEventListener('click', async () => {
     });
 
     const link = document.createElement('a');
-    const fileTitle = (calTitleInput.value.trim() || 'streamer-calendar').replace(/\s+/g, '_');
+    const fileTitle = (calSubTitle.textContent.trim() || 'streamer-calendar').replace(/\s+/g, '_');
     link.download = `${fileTitle}_${state.viewYear}-${String(state.viewMonth + 1).padStart(2, '0')}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
@@ -1512,24 +1340,50 @@ async function syncSchedulesFromSheet() {
 if (manualSyncBtn) manualSyncBtn.addEventListener('click', syncSchedulesFromSheet);
 if (manualSyncBtnAdmin) manualSyncBtnAdmin.addEventListener('click', syncSchedulesFromSheet);
 
+/* 구글 시트(SETTINGS_SHEET)를 읽어서 테마 컬러/배경 이미지/캘린더 제목을 채운다.
+   - 데이터 행(2행)의 칸 구성: 메인컬러, 서브컬러, 캘린더제목, 배경이미지URL, (관리자비밀번호)
+   - 값이 비어있으면 그냥 CSS 기본값/기존 상태를 유지한다. */
+async function syncSettingsFromSheet() {
+  if (location.protocol === 'file:') return; // 이유는 syncSchedulesFromSheet 참고
+
+  try {
+    const csv = await fetchSheetCsv(SETTINGS_SHEET);
+    const rows = parseCsv(csv);
+    const dataRow = rows[1] || [];
+
+    const mainColor = (dataRow[0] || '').trim();
+    const subColor = (dataRow[1] || '').trim();
+    const calTitle = (dataRow[2] || '').trim();
+    const bgImageUrl = (dataRow[3] || '').trim();
+
+    applyThemeColors(mainColor, subColor);
+    calSubTitle.textContent = calTitle || 'MY STREAMING CALENDAR';
+    calendarCapture.style.backgroundImage = bgImageUrl ? `url(${bgImageUrl})` : 'none';
+  } catch (err) {
+    // 설정 동기화 실패는 치명적이지 않다 — CSS 기본 컬러/빈 배경으로 그냥 보여준다.
+    console.error('설정 동기화 실패:', err);
+  }
+}
+
+const manualSettingsSyncBtn = document.getElementById('manualSettingsSyncBtn');
+if (manualSettingsSyncBtn) {
+  manualSettingsSyncBtn.addEventListener('click', () => {
+    syncSettingsFromSheet();
+    syncSchedulesFromSheet();
+  });
+}
+
 /* ================================================================
    9. 배포용 설정 내보내기
-   - 이 페이지는 정적 파일이라 관리자가 편집한 내용이 자동으로
-     다른 방문자에게 퍼지지 않는다. 그래서 "지금 이 상태를 그대로
-     복사해서 넘겨줄 테니, 이걸 기본값으로 다시 배포해달라"는
-     요청을 만들 수 있게 현재 상태를 JSON으로 뽑아준다.
+   - 카테고리 목록만 이 브라우저에 저장되는 관리자 작업본이다
+     (컬러/배경/제목/일정은 이미 구글 시트가 모두에게 자동으로 보여줌).
+     그래서 "지금 카테고리 목록을 그대로 넘겨줄 테니, 이걸 기본값으로
+     다시 배포해달라"는 요청을 만들 수 있게 JSON으로 뽑아준다.
 ================================================================ */
 const exportConfigBtn = document.getElementById('exportConfigBtn');
 
 exportConfigBtn.addEventListener('click', async () => {
-  const payload = {
-    mainColor: mainColorInput.value,
-    subColor: subColorInput.value,
-    calTitle: calTitleInput.value,
-    categories: state.categories,
-    bgImage: getCurrentBgImageUrl(),
-    bgFileLabel: bgFileName.textContent,
-  };
+  const payload = { categories: state.categories };
   const json = JSON.stringify(payload);
 
   try {
@@ -1552,15 +1406,16 @@ exportConfigBtn.addEventListener('click', async () => {
 /* ================================================================
    초기 실행
    - applyAdminModeUI()로 관리자 잠금 상태를 먼저 화면에 반영한 뒤,
-     loadState()가 그 상태에 맞는 색상/카테고리/제목/배경(방문자=배포
-     기본값 / 관리자=이 브라우저의 작업본)을 불러와 채운다.
-   - 일정만은 별도로, 누구에게나 항상 syncSchedulesFromSheet()가
-     구글 시트에서 실시간으로 읽어온다.
+     loadState()가 그 상태에 맞는 카테고리 목록(방문자=배포 기본값 /
+     관리자=이 브라우저의 작업본)을 불러와 채운다.
+   - 컬러/배경/제목/일정은 누구에게나 항상 구글 시트에서 실시간으로
+     읽어온다 (syncSettingsFromSheet / syncSchedulesFromSheet).
 ================================================================ */
 applyAdminModeUI(isAdminUnlocked());
 loadState();
 renderCategories();
 renderCalendar();
+syncSettingsFromSheet();
 syncSchedulesFromSheet();
 </script>
 </body>
