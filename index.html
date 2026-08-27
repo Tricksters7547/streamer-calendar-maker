@@ -611,7 +611,39 @@
         <span class="dot"></span>
         <h1>STREAMER CALENDAR MAKER</h1>
       </div>
-      <span>나만의 방송 일정표를 만들어 팬들과 공유해보세요 ✨<br />💾 이 브라우저에 자동 저장돼요</span>
+      <span>나만의 방송 일정표를 만들어 팬들과 공유해보세요 ✨</span>
+
+      <!-- 관리자 로그인 : 뷰어(일반 방문자)에게도 항상 보이는 유일한 컨트롤.
+           비밀번호를 맞춰야만 아래 편집 패널(adminPanel)이 열린다.
+           ※ 정적 페이지라 진짜 보안이 아니라 "가벼운 잠금"이라는 점에 유의 -->
+      <section class="section" id="adminLoginSection">
+        <div class="section-title"><span class="num">🔒</span> 관리자 모드</div>
+
+        <div id="adminLockedView">
+          <p class="sheet-help">
+            색상 · 배경 · 카테고리 · 일정을 편집하려면 관리자 비밀번호를 입력하세요.
+            일반 방문자는 완성된 캘린더 보기와 PNG 저장만 가능해요.
+          </p>
+          <div class="field">
+            <input type="password" id="adminPasswordInput" placeholder="관리자 비밀번호" />
+          </div>
+          <button type="button" class="add-btn" id="adminLoginBtn">🔓 잠금 해제</button>
+          <div class="sheet-status error" id="adminLoginError" style="display:none;">
+            비밀번호가 올바르지 않아요
+          </div>
+        </div>
+
+        <div id="adminUnlockedView" style="display:none;">
+          <p class="sheet-help">
+            ✅ 관리자 모드예요. 편집 내용은 이 브라우저에만 자동 저장되고,
+            다른 방문자에게 보이게 하려면 아래 "설정 내보내기"로 배포를 요청하세요.
+          </p>
+          <button type="button" class="add-btn" id="adminLogoutBtn">🔒 관리자 모드 종료</button>
+        </div>
+      </section>
+
+      <!-- 편집 패널 전체. 관리자 로그인 전에는 완전히 숨겨져 있다 -->
+      <div id="adminPanel" style="display:none;">
 
       <!-- 1. 컬러 커스텀 -->
       <section class="section">
@@ -716,6 +748,19 @@
         <button type="button" class="add-btn" id="loadSheetBtn">📥 시트에서 불러오기</button>
         <div class="sheet-status" id="sheetStatus"></div>
       </section>
+
+      <!-- 7. 배포용 설정 내보내기 -->
+      <section class="section">
+        <div class="section-title"><span class="num">7</span> 다른 사람에게도 보이게 하기</div>
+        <p class="sheet-help">
+          이 사이트는 서버가 없어서, 지금 편집한 내용은 <b>이 브라우저에만</b> 저장돼요.
+          팬들이 접속했을 때도 이 설정이 보이게 하려면, 아래 버튼으로 설정을 복사해서
+          Claude 대화창에 붙여넣어 "배포해줘"라고 요청해주세요. 실제 사이트에 반영해드릴게요.
+        </p>
+        <button type="button" class="add-btn" id="exportConfigBtn">📤 설정 복사하기 (배포 요청용)</button>
+      </section>
+
+      </div><!-- /#adminPanel -->
     </aside>
 
     <!-- =========================================================
@@ -827,9 +872,109 @@ function showToast(message) {
 }
 
 /* ---------------------------------------------------------------
+   배포된 기본값 (DEFAULT_STATE)
+   - 이 페이지는 서버/DB가 없는 정적 파일이라, 방문자마다 서로 다른
+     localStorage를 갖는다 -> 그대로 두면 관리자가 등록한 일정을
+     "다른 사람은 못 보는" 문제가 생긴다.
+   - 그래서 "지금 모두에게 보이는 상태"를 이 상수에 그대로 박아둔다.
+     관리자가 아닌 일반 방문자는 항상 이 값을 그대로 보게 되고,
+     관리자가 설정을 바꾸고 "배포"를 요청하면(7번 섹션) 이 상수 값을
+     새로 고쳐서 다시 배포한다.
+--------------------------------------------------------------- */
+const DEFAULT_STATE = {
+  mainColor: '#b98cf9',
+  subColor: '#ff8fc7',
+  calTitle: '',
+  categories: [
+    { key: 'start',   label: '방송시작', color: 'var(--main-color)' },
+    { key: 'off',     label: '휴방',     color: '#9a9aa5' },
+    { key: 'collab',  label: '합방',     color: 'var(--sub-color)' },
+    { key: 'youtube', label: '유튜브',   color: '#ff5b5b' },
+  ],
+  schedules: {},
+  bgImage: null,
+  bgFileLabel: '',
+};
+
+/* ---------------------------------------------------------------
+   관리자 모드 (비밀번호 잠금)
+   - 이 파일은 서버가 없는 정적 페이지라, 여기서 하는 "로그인"은
+     진짜 보안이 아니라 팬들이 실수로/장난으로 설정을 못 건드리게
+     막는 정도의 가벼운 잠금이다. 페이지 소스나 개발자 도구를 볼 줄
+     아는 사람은 우회할 수 있다는 걸 감안해야 한다 (민감한 비밀번호
+     재사용 금지).
+   - 비밀번호 원문 대신 SHA-256 해시만 코드에 남겨서, 최소한 "소스
+     보기"만으로 원문이 바로 드러나지는 않게 한다.
+   - 잠금 해제 상태는 localStorage에 저장해서, 같은 기기/브라우저에서는
+     다시 열어도 매번 비밀번호를 칠 필요가 없게 한다("이 기기 기억하기"
+     와 같은 개념). 다른 사람 컴퓨터라면 로그아웃해두면 된다.
+--------------------------------------------------------------- */
+const ADMIN_SESSION_KEY = 'streamerCalendarMaker.adminUnlocked.v1';
+const ADMIN_PASSWORD_HASH = '0c51a3fa6c2547353df4840972267132512a7061ecceb4605276c80032097c03'; // sha256("Trick0405")
+
+async function sha256Hex(text) {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function isAdminUnlocked() {
+  try {
+    return localStorage.getItem(ADMIN_SESSION_KEY) === '1';
+  } catch (err) {
+    return false;
+  }
+}
+
+const adminLockedView = document.getElementById('adminLockedView');
+const adminUnlockedView = document.getElementById('adminUnlockedView');
+const adminPanel = document.getElementById('adminPanel');
+const adminPasswordInput = document.getElementById('adminPasswordInput');
+const adminLoginBtn = document.getElementById('adminLoginBtn');
+const adminLoginError = document.getElementById('adminLoginError');
+const adminLogoutBtn = document.getElementById('adminLogoutBtn');
+
+function applyAdminModeUI(isAdmin) {
+  adminPanel.style.display = isAdmin ? 'block' : 'none';
+  adminLockedView.style.display = isAdmin ? 'none' : 'block';
+  adminUnlockedView.style.display = isAdmin ? 'block' : 'none';
+}
+
+async function tryAdminLogin() {
+  const hash = await sha256Hex(adminPasswordInput.value);
+  if (hash === ADMIN_PASSWORD_HASH) {
+    try { localStorage.setItem(ADMIN_SESSION_KEY, '1'); } catch (err) { /* 무시 */ }
+    adminPasswordInput.value = '';
+    adminLoginError.style.display = 'none';
+    applyAdminModeUI(true);
+    loadState(); // 관리자 전용 데이터(이 브라우저의 작업본)를 새로 불러온다
+    renderCategories();
+    renderCalendar();
+    showToast('관리자 모드로 전환했어요 🔓');
+  } else {
+    adminLoginError.style.display = 'block';
+    showToast('비밀번호가 올바르지 않아요');
+  }
+}
+
+adminLoginBtn.addEventListener('click', tryAdminLogin);
+adminPasswordInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') tryAdminLogin();
+});
+
+adminLogoutBtn.addEventListener('click', () => {
+  try { localStorage.removeItem(ADMIN_SESSION_KEY); } catch (err) { /* 무시 */ }
+  applyAdminModeUI(false);
+  loadState(); // 방문자와 똑같이 배포된 기본값으로 되돌아간다
+  renderCategories();
+  renderCalendar();
+  showToast('관리자 모드를 종료했어요');
+});
+
+/* ---------------------------------------------------------------
    로컬 저장 (localStorage)
-   - 서버가 없으므로 "저장"은 이 브라우저 안에서만 의미가 있다.
-     같은 브라우저로 이 파일을 다시 열면 마지막 상태가 복원된다.
+   - 관리자가 편집한 "작업본"만 이 브라우저에 저장한다 (일반 방문자는
+     저장/복원 대상이 아니라 항상 DEFAULT_STATE를 본다).
    - 컬러/카테고리/일정/제목/배경이미지를 하나의 JSON으로 묶어서 저장한다.
    - 배경 이미지(Data URL)는 용량이 커서 localStorage 한도를 넘길 수 있으므로,
      실패하면 이미지만 빼고 나머지라도 저장되도록 한 번 더 시도한다.
@@ -867,45 +1012,73 @@ function saveState() {
   }
 }
 
-function loadState() {
-  let raw;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch (err) {
-    return; // 프라이빗 브라우징 등으로 localStorage 접근이 막힌 경우 -> 기본값으로 시작
-  }
-  if (!raw) return;
+/* data(mainColor/subColor/calTitle/categories/schedules/bgImage)를
+   실제 입력창/state에 반영하는 공통 로직. DEFAULT_STATE를 보여줄 때와
+   localStorage에 저장된 관리자 작업본을 복원할 때 모두 이걸 재사용한다. */
+function applyLoadedData(rawData) {
+  // rawData(특히 DEFAULT_STATE)의 categories/schedules를 참조 그대로 state에 물리면,
+  // 이후 일정 추가/삭제 같은 state 변형이 원본 객체까지 그대로 오염시킨다
+  // (DEFAULT_STATE는 페이지가 살아있는 동안 계속 재사용되는 공유 상수이므로 특히 위험).
+  // 그래서 항상 깊은 복사본을 만들어 state에 넣는다.
+  const data = structuredClone(rawData);
 
-  let saved;
-  try {
-    saved = JSON.parse(raw);
-  } catch (err) {
+  if (data.mainColor) mainColorInput.value = data.mainColor;
+  if (data.subColor) subColorInput.value = data.subColor;
+  applyThemeColors();
+
+  if (typeof data.calTitle === 'string') {
+    calTitleInput.value = data.calTitle;
+    calSubTitle.textContent = data.calTitle.trim() || 'MY STREAMING CALENDAR';
+  }
+
+  if (Array.isArray(data.categories) && data.categories.length > 0) {
+    state.categories = data.categories;
+  }
+  state.schedules = (data.schedules && typeof data.schedules === 'object') ? data.schedules : {};
+
+  if (data.bgImage) {
+    calendarCapture.style.backgroundImage = `url(${data.bgImage})`;
+    bgFileName.textContent = data.bgFileLabel || '저장된 배경 이미지 적용됨';
+    resetBgBtn.style.display = 'inline-block';
+  } else {
+    calendarCapture.style.backgroundImage = 'none';
+    bgFileName.textContent = '';
+    resetBgBtn.style.display = 'none';
+  }
+}
+
+function loadState() {
+  // 일반 방문자(관리자 아님) : 항상 배포된 기본값(DEFAULT_STATE)을 그대로 본다.
+  // 이렇게 해야 관리자가 등록한 일정/컬러/배경이 "다른 사람에게도" 보인다.
+  if (!isAdminUnlocked()) {
+    applyLoadedData(DEFAULT_STATE);
     return;
   }
 
-  if (saved.mainColor) mainColorInput.value = saved.mainColor;
-  if (saved.subColor) subColorInput.value = saved.subColor;
-  applyThemeColors();
-
-  if (typeof saved.calTitle === 'string') {
-    calTitleInput.value = saved.calTitle;
-    calSubTitle.textContent = saved.calTitle.trim() || 'MY STREAMING CALENDAR';
+  // 관리자 : 이 브라우저에 저장해둔 작업본이 있으면 이어서 사용하고,
+  // 없으면(처음 로그인) 배포된 기본값에서부터 편집을 시작한다.
+  let raw = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (err) {
+    // 프라이빗 브라우징 등으로 localStorage 접근이 막힌 경우 -> 기본값으로 시작
   }
 
-  if (Array.isArray(saved.categories) && saved.categories.length > 0) {
-    state.categories = saved.categories;
-  }
-  if (saved.schedules && typeof saved.schedules === 'object') {
-    state.schedules = saved.schedules;
-  }
-
-  if (saved.bgImage) {
-    calendarCapture.style.backgroundImage = `url(${saved.bgImage})`;
-    bgFileName.textContent = saved.bgFileLabel || '저장된 배경 이미지 적용됨';
-    resetBgBtn.style.display = 'inline-block';
+  let saved = null;
+  if (raw) {
+    try {
+      saved = JSON.parse(raw);
+    } catch (err) {
+      saved = null;
+    }
   }
 
-  showToast('저장된 설정을 불러왔어요 💾');
+  if (saved) {
+    applyLoadedData(saved);
+    showToast('저장된 작업본을 불러왔어요 💾');
+  } else {
+    applyLoadedData(DEFAULT_STATE);
+  }
 }
 
 /* ================================================================
@@ -1464,10 +1637,50 @@ if (location.protocol === 'file:') {
 }
 
 /* ================================================================
-   초기 실행
-   - loadState()가 먼저 실행되어 저장된 카테고리/일정/컬러/배경을
-     state와 각 입력창에 복원한 뒤, 그 값을 기준으로 화면을 그린다.
+   9. 배포용 설정 내보내기
+   - 이 페이지는 정적 파일이라 관리자가 편집한 내용이 자동으로
+     다른 방문자에게 퍼지지 않는다. 그래서 "지금 이 상태를 그대로
+     복사해서 넘겨줄 테니, 이걸 기본값으로 다시 배포해달라"는
+     요청을 만들 수 있게 현재 상태를 JSON으로 뽑아준다.
 ================================================================ */
+const exportConfigBtn = document.getElementById('exportConfigBtn');
+
+exportConfigBtn.addEventListener('click', async () => {
+  const payload = {
+    mainColor: mainColorInput.value,
+    subColor: subColorInput.value,
+    calTitle: calTitleInput.value,
+    categories: state.categories,
+    schedules: state.schedules,
+    bgImage: getCurrentBgImageUrl(),
+    bgFileLabel: bgFileName.textContent,
+  };
+  const json = JSON.stringify(payload);
+
+  try {
+    await navigator.clipboard.writeText(json);
+    showToast('설정을 클립보드에 복사했어요 — Claude에게 붙여넣어 주세요 📋');
+  } catch (err) {
+    console.error(err);
+    // 클립보드 API를 못 쓰는 환경(권한 거부 등)에서는 수동 복사용 창을 띄운다.
+    // 일부 임베디드/인앱 브라우저는 window.prompt()조차 지원하지 않아 여기서도
+    // 예외가 날 수 있으므로, 그 경우에도 최소한 토스트로는 실패를 알린다.
+    try {
+      window.prompt('아래 내용을 전체 선택(Ctrl+A) 후 복사해서 전달해주세요:', json);
+    } catch (err2) {
+      console.error(err2);
+      showToast('자동 복사에 실패했어요 — 개발자 도구 콘솔에서 exportConfigBtn 결과를 직접 확인해주세요');
+    }
+  }
+});
+
+/* ================================================================
+   초기 실행
+   - initAdminModeUI()로 관리자 잠금 상태를 먼저 화면에 반영한 뒤,
+     loadState()가 그 상태에 맞는 데이터(방문자=배포 기본값 /
+     관리자=이 브라우저의 작업본)를 불러와 채운다.
+================================================================ */
+applyAdminModeUI(isAdminUnlocked());
 loadState();
 renderCategories();
 renderCalendar();
