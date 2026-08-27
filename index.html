@@ -137,7 +137,9 @@
     margin-bottom: 7px;
   }
 
-  /* 카테고리 추가 폼의 컬러피커 (input[type=color]는 여기서만 쓰인다) */
+  /* 컬러피커 2개를 나란히 배치 (설정 미리보기 / 카테고리 추가 폼에서 사용) */
+  .color-row { display: flex; gap: 12px; }
+  .color-field { flex: 1; }
   input[type="color"] {
     -webkit-appearance: none;
     appearance: none;
@@ -582,21 +584,44 @@
       <!-- 편집 패널 전체. 관리자 로그인 전에는 완전히 숨겨져 있다 -->
       <div id="adminPanel" style="display:none;">
 
-      <!-- 1. 설정 데이터 : 테마 컬러 / 배경 이미지 / 캘린더 제목도 이제
-           구글 시트에서 자동으로 반영된다 (일정과 같은 원리). -->
+      <!-- 1. 설정 데이터 : 테마 컬러 / 배경 이미지 / 캘린더 제목은 구글 시트가
+           정답이고, 모든 방문자에게 거기서 자동으로 반영된다. 아래 컬러
+           피커/입력창은 어디까지나 "미리보기 + 시트에 저장" 도구다 —
+           저장 버튼을 눌러야만 실제로 시트에 반영되고, 그래야 다른
+           방문자에게도 보인다. -->
       <section class="section">
         <div class="section-title"><span class="num">1</span> 설정 데이터</div>
         <p class="sheet-help">
-          테마 컬러 · 배경 이미지 · 캘린더 제목은 연결된 구글 시트에서
-          <b>모든 방문자에게 자동으로</b> 반영돼요. 바꾸고 싶으면 이 페이지가
-          아니라 <b>시트를 직접 편집</b>하면 됩니다.
+          테마 컬러 · 배경 이미지 · 캘린더 제목은 연결된 구글 시트가 정답이고,
+          <b>모든 방문자에게 자동으로</b> 반영돼요. 아래에서 미리 보면서 값을
+          바꾼 뒤 "시트에 저장"을 눌러야 실제로 반영됩니다 (시트 셀을 직접
+          편집해도 동일하게 동작해요).
         </p>
-        <p class="sheet-help">
-          열 구성(1행 헤더 + 2행 값): <b>메인컬러 · 서브컬러 · 캘린더제목 · 배경이미지URL</b>.
-          컬러는 <code>#rrggbb</code> 형식, 배경이미지URL은 Imgur 등에 올린 이미지의
-          직접 링크를 넣어주세요 (네이버 블로그/카페 이미지는 외부에서 막혀 있어 동작하지 않아요).
-        </p>
-        <button type="button" class="add-btn" id="manualSettingsSyncBtn">🔄 지금 다시 불러오기</button>
+
+        <div class="color-row">
+          <div class="color-field">
+            <label for="previewMainColor">메인 컬러 (미리보기)</label>
+            <input type="color" id="previewMainColor" value="#b98cf9" />
+          </div>
+          <div class="color-field">
+            <label for="previewSubColor">서브 컬러 (미리보기)</label>
+            <input type="color" id="previewSubColor" value="#ff8fc7" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="previewCalTitle">캘린더 제목</label>
+          <input type="text" id="previewCalTitle" placeholder="예: 설홍의 9월 방송표" maxlength="30" />
+        </div>
+
+        <div class="field">
+          <label for="previewBgImageUrl">배경 이미지 URL (Imgur 등 직접 링크)</label>
+          <input type="text" id="previewBgImageUrl" placeholder="https://i.imgur.com/xxxxx.png" />
+        </div>
+
+        <button type="button" class="add-btn" id="saveSettingsToSheetBtn">💾 이 값들을 시트에 저장</button>
+        <button type="button" class="add-btn" id="manualSettingsSyncBtn">🔄 시트에서 다시 불러오기</button>
+        <div class="sheet-status" id="settingsWriteStatus"></div>
       </section>
 
       <!-- 2. 카테고리 관리 -->
@@ -627,7 +652,25 @@
           열 구성: <b>A=날짜(YYYY-MM-DD) · B=카테고리 · C=내용</b>, 1행은 헤더로 비워두세요.
           카테고리 칸에는 왼쪽 "카테고리 관리"에 있는 이름을 그대로 적으면 자동 매칭됩니다.
         </p>
-        <button type="button" class="add-btn" id="manualSyncBtnAdmin">🔄 지금 다시 불러오기</button>
+
+        <!-- 시트를 직접 열지 않고도 이 폼으로 바로 행을 추가할 수 있다.
+             (내부적으로는 결국 시트에 새 행을 쓰는 것과 동일하다) -->
+        <div class="field">
+          <label for="newScheduleDate">날짜</label>
+          <input type="date" id="newScheduleDate" />
+        </div>
+        <div class="field">
+          <label for="newScheduleCategory">카테고리</label>
+          <select id="newScheduleCategory"></select>
+        </div>
+        <div class="field">
+          <label for="newScheduleText">내용</label>
+          <input type="text" id="newScheduleText" placeholder="예: 21시 발로란트 저챗" maxlength="18" />
+        </div>
+        <button type="button" class="add-btn" id="addScheduleToSheetBtn">📤 시트에 일정 추가</button>
+        <div class="sheet-status" id="scheduleWriteStatus"></div>
+
+        <button type="button" class="add-btn" id="manualSyncBtnAdmin" style="margin-top:14px;">🔄 지금 다시 불러오기</button>
       </section>
 
       <!-- 4. 배포용 설정 내보내기 (카테고리 목록에만 해당.
@@ -792,6 +835,11 @@ const SETTINGS_SHEET    = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', 
 const CREDENTIALS_SHEET = SETTINGS_SHEET;
 const SCHEDULE_SHEET    = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1998787329' };
 
+// 구글 시트로 "쓰기"는 CSV 내보내기로 안 되기 때문에, 시트에 바인딩된
+// Apps Script 웹앱을 통해서만 가능하다. 이 URL은 배포 후 채워 넣는다.
+// (설정 방법은 관리자에게 별도로 안내됨)
+const APPS_SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
 function sheetCsvUrl(sheet) {
   return `https://docs.google.com/spreadsheets/d/${sheet.id}/export?format=csv&gid=${sheet.gid}`;
 }
@@ -800,6 +848,27 @@ async function fetchSheetCsv(sheet) {
   const res = await fetch(sheetCsvUrl(sheet));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.text();
+}
+
+/* Apps Script 웹앱으로 "쓰기" 요청을 보낸다.
+   - Content-Type을 text/plain으로 보내는 이유: JSON으로 보내면 브라우저가
+     먼저 OPTIONS(프리플라이트) 요청을 보내는데, Apps Script 웹앱은 이걸
+     제대로 처리하지 못해 실패하는 경우가 많다. text/plain으로 보내면
+     "단순 요청"으로 취급되어 프리플라이트 없이 바로 POST된다.
+     (Apps Script 쪽에서는 e.postData.contents를 JSON.parse 해서 사용) */
+async function writeToSheet(action, payload) {
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_YOUR')) {
+    throw new Error('APPS_SCRIPT_NOT_CONFIGURED');
+  }
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, password: adminPasswordCache, ...payload }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const result = await res.json();
+  if (!result.ok) throw new Error(result.error || 'unknown error');
+  return result;
 }
 
 /* ---------------------------------------------------------------
@@ -818,6 +887,12 @@ async function fetchSheetCsv(sheet) {
      로그아웃해두면 된다.
 --------------------------------------------------------------- */
 const ADMIN_SESSION_KEY = 'streamerCalendarMaker.adminUnlocked.v1';
+
+// 로그인에 성공한 비밀번호를 메모리에만 잠깐 들고 있는다 (localStorage에는 안 남김).
+// 시트에 "쓰기"(설정 저장, 일정 추가)를 할 때 Apps Script 쪽에서 다시 검증하려면
+// 매번 비밀번호가 필요한데, 로그인할 때마다 다시 입력하게 하면 번거롭기 때문이다.
+// 새로고침하면 사라지고, 로그아웃하면 즉시 지운다.
+let adminPasswordCache = '';
 
 function isAdminUnlocked() {
   try {
@@ -870,6 +945,7 @@ async function tryAdminLogin() {
 
     if (storedPassword && input === storedPassword) {
       try { localStorage.setItem(ADMIN_SESSION_KEY, '1'); } catch (err) { /* 무시 */ }
+      adminPasswordCache = storedPassword;
       adminPasswordInput.value = '';
       adminLoginError.style.display = 'none';
       applyAdminModeUI(true);
@@ -897,6 +973,7 @@ adminPasswordInput.addEventListener('keydown', (e) => {
 
 adminLogoutBtn.addEventListener('click', () => {
   try { localStorage.removeItem(ADMIN_SESSION_KEY); } catch (err) { /* 무시 */ }
+  adminPasswordCache = '';
   applyAdminModeUI(false);
   loadState(); // 방문자와 똑같이 배포된 기본값으로 되돌아간다
   renderCategories();
@@ -1082,11 +1159,10 @@ const categoryList = document.getElementById('categoryList');
 const newCategoryColor = document.getElementById('newCategoryColor');
 const newCategoryLabel = document.getElementById('newCategoryLabel');
 const addCategoryBtn = document.getElementById('addCategoryBtn');
+const newScheduleCategory = document.getElementById('newScheduleCategory');
 
 function renderCategories() {
-  // "카테고리 관리" 섹션의 칩 목록을 다시 그린다. (카테고리 선택 <select>는
-  // 이제 없다 — 일정은 구글 시트에서 카테고리 "이름"으로 매칭되기 때문에
-  // normalizeCategory()가 state.categories의 label과 직접 비교한다.)
+  // "카테고리 관리" 섹션의 칩 목록을 다시 그린다.
   categoryList.innerHTML = '';
   state.categories.forEach((cat) => {
     const chip = document.createElement('div');
@@ -1104,6 +1180,21 @@ function renderCategories() {
   categoryList.querySelectorAll('.remove').forEach((btn) => {
     btn.addEventListener('click', () => removeCategory(btn.dataset.key));
   });
+
+  // "일정 추가" 폼의 카테고리 <select> 옵션도 같이 갱신 (선택값 최대한 유지)
+  if (newScheduleCategory) {
+    const prevValue = newScheduleCategory.value;
+    newScheduleCategory.innerHTML = '';
+    state.categories.forEach((cat) => {
+      const opt = document.createElement('option');
+      opt.value = cat.label; // 시트에는 카테고리 "이름"으로 저장되므로 label을 값으로 쓴다
+      opt.textContent = cat.label;
+      newScheduleCategory.appendChild(opt);
+    });
+    if (state.categories.some((c) => c.label === prevValue)) {
+      newScheduleCategory.value = prevValue;
+    }
+  }
 }
 
 function addCategory() {
@@ -1340,9 +1431,64 @@ async function syncSchedulesFromSheet() {
 if (manualSyncBtn) manualSyncBtn.addEventListener('click', syncSchedulesFromSheet);
 if (manualSyncBtnAdmin) manualSyncBtnAdmin.addEventListener('click', syncSchedulesFromSheet);
 
+/* "일정 추가" 폼 : 시트를 직접 열지 않고도 바로 새 행을 추가할 수 있게 한다.
+   실제로는 Apps Script를 통해 SCHEDULE_SHEET에 새 행을 append하는 것과
+   동일하다 — 성공하면 곧바로 다시 동기화해서 화면에 반영한다. */
+const newScheduleDate = document.getElementById('newScheduleDate');
+const newScheduleText = document.getElementById('newScheduleText');
+const addScheduleToSheetBtn = document.getElementById('addScheduleToSheetBtn');
+const scheduleWriteStatus = document.getElementById('scheduleWriteStatus');
+
+if (addScheduleToSheetBtn) {
+  addScheduleToSheetBtn.addEventListener('click', async () => {
+    const date = newScheduleDate.value; // <input type="date"> 는 항상 YYYY-MM-DD
+    const category = newScheduleCategory.value;
+    const text = newScheduleText.value.trim();
+
+    if (!date) { showToast('날짜를 선택해주세요'); return; }
+    if (!text) { showToast('일정 내용을 입력해주세요'); return; }
+
+    addScheduleToSheetBtn.disabled = true;
+    const originalText = addScheduleToSheetBtn.textContent;
+    addScheduleToSheetBtn.textContent = '추가 중...';
+    scheduleWriteStatus.className = 'sheet-status';
+    scheduleWriteStatus.textContent = '';
+
+    try {
+      await writeToSheet('addSchedule', { date, category, text });
+      scheduleWriteStatus.classList.add('success');
+      scheduleWriteStatus.textContent = '시트에 추가했어요 — 모든 방문자에게 반영됩니다';
+      showToast('일정을 시트에 추가했어요 📤');
+      newScheduleText.value = '';
+      await syncSchedulesFromSheet(); // 방금 추가한 행까지 포함해서 다시 불러옴
+    } catch (err) {
+      console.error(err);
+      scheduleWriteStatus.classList.add('error');
+      scheduleWriteStatus.textContent =
+        err.message === 'APPS_SCRIPT_NOT_CONFIGURED'
+          ? 'Apps Script 연동이 아직 설정되지 않았어요 (Claude에게 문의해주세요)'
+          : '추가 실패 — 인터넷 연결과 Apps Script 배포 상태를 확인해주세요';
+      showToast('시트에 일정 추가를 실패했어요');
+    } finally {
+      addScheduleToSheetBtn.disabled = false;
+      addScheduleToSheetBtn.textContent = originalText;
+    }
+  });
+}
+
+const previewMainColor = document.getElementById('previewMainColor');
+const previewSubColor = document.getElementById('previewSubColor');
+const previewCalTitle = document.getElementById('previewCalTitle');
+const previewBgImageUrl = document.getElementById('previewBgImageUrl');
+const saveSettingsToSheetBtn = document.getElementById('saveSettingsToSheetBtn');
+const settingsWriteStatus = document.getElementById('settingsWriteStatus');
+const manualSettingsSyncBtn = document.getElementById('manualSettingsSyncBtn');
+
 /* 구글 시트(SETTINGS_SHEET)를 읽어서 테마 컬러/배경 이미지/캘린더 제목을 채운다.
    - 데이터 행(2행)의 칸 구성: 메인컬러, 서브컬러, 캘린더제목, 배경이미지URL, (관리자비밀번호)
-   - 값이 비어있으면 그냥 CSS 기본값/기존 상태를 유지한다. */
+   - 값이 비어있으면 그냥 CSS 기본값/기존 상태를 유지한다.
+   - 관리자 패널의 미리보기 입력창들도 여기서 같이 채워서, 시트에 있는
+     "현재 값"에서부터 이어서 조정할 수 있게 한다. */
 async function syncSettingsFromSheet() {
   if (location.protocol === 'file:') return; // 이유는 syncSchedulesFromSheet 참고
 
@@ -1359,17 +1505,64 @@ async function syncSettingsFromSheet() {
     applyThemeColors(mainColor, subColor);
     calSubTitle.textContent = calTitle || 'MY STREAMING CALENDAR';
     calendarCapture.style.backgroundImage = bgImageUrl ? `url(${bgImageUrl})` : 'none';
+
+    if (previewMainColor && mainColor) previewMainColor.value = mainColor;
+    if (previewSubColor && subColor) previewSubColor.value = subColor;
+    if (previewCalTitle) previewCalTitle.value = calTitle;
+    if (previewBgImageUrl) previewBgImageUrl.value = bgImageUrl;
   } catch (err) {
     // 설정 동기화 실패는 치명적이지 않다 — CSS 기본 컬러/빈 배경으로 그냥 보여준다.
     console.error('설정 동기화 실패:', err);
   }
 }
 
-const manualSettingsSyncBtn = document.getElementById('manualSettingsSyncBtn');
 if (manualSettingsSyncBtn) {
   manualSettingsSyncBtn.addEventListener('click', () => {
     syncSettingsFromSheet();
     syncSchedulesFromSheet();
+  });
+}
+
+// 컬러/제목/배경 URL 입력창은 시트에 저장하기 전이라도 즉시 미리보기에 반영된다.
+if (previewMainColor) previewMainColor.addEventListener('input', () => applyThemeColors(previewMainColor.value, previewSubColor.value));
+if (previewSubColor) previewSubColor.addEventListener('input', () => applyThemeColors(previewMainColor.value, previewSubColor.value));
+if (previewCalTitle) previewCalTitle.addEventListener('input', () => { calSubTitle.textContent = previewCalTitle.value.trim() || 'MY STREAMING CALENDAR'; });
+if (previewBgImageUrl) previewBgImageUrl.addEventListener('input', () => {
+  const url = previewBgImageUrl.value.trim();
+  calendarCapture.style.backgroundImage = url ? `url(${url})` : 'none';
+});
+
+if (saveSettingsToSheetBtn) {
+  saveSettingsToSheetBtn.addEventListener('click', async () => {
+    saveSettingsToSheetBtn.disabled = true;
+    const originalText = saveSettingsToSheetBtn.textContent;
+    saveSettingsToSheetBtn.textContent = '저장 중...';
+    settingsWriteStatus.className = 'sheet-status';
+    settingsWriteStatus.textContent = '';
+
+    try {
+      await writeToSheet('updateSettings', {
+        mainColor: previewMainColor.value,
+        subColor: previewSubColor.value,
+        calTitle: previewCalTitle.value,
+        bgImageUrl: previewBgImageUrl.value.trim(),
+      });
+      settingsWriteStatus.classList.add('success');
+      settingsWriteStatus.textContent = '시트에 저장했어요 — 모든 방문자에게 반영됩니다';
+      showToast('설정을 시트에 저장했어요 💾');
+      await syncSettingsFromSheet(); // 실제로 반영됐는지 다시 읽어서 확인
+    } catch (err) {
+      console.error(err);
+      settingsWriteStatus.classList.add('error');
+      settingsWriteStatus.textContent =
+        err.message === 'APPS_SCRIPT_NOT_CONFIGURED'
+          ? 'Apps Script 연동이 아직 설정되지 않았어요 (Claude에게 문의해주세요)'
+          : '저장 실패 — 인터넷 연결과 Apps Script 배포 상태를 확인해주세요';
+      showToast('시트 저장에 실패했어요');
+    } finally {
+      saveSettingsToSheetBtn.disabled = false;
+      saveSettingsToSheetBtn.textContent = originalText;
+    }
   });
 }
 
