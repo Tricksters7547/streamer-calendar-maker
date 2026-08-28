@@ -671,7 +671,7 @@
       <section class="section">
         <div class="section-title">
           <span class="num">🔗</span> 연결된 구글 시트
-          <button type="button" class="section-toggle-btn" id="toggleSheetConfigBtn" title="보이기">👁️</button>
+          <button type="button" class="section-toggle-btn" id="toggleSheetConfigBtn" title="보이기">▶</button>
         </div>
 
         <!-- 실수로 URL/ID가 눈에 띄지 않도록 기본은 숨김 상태.
@@ -1181,7 +1181,7 @@ if (toggleSheetConfigBtn && sheetConfigBody) {
   toggleSheetConfigBtn.addEventListener('click', () => {
     const willShow = sheetConfigBody.style.display === 'none';
     sheetConfigBody.style.display = willShow ? 'block' : 'none';
-    toggleSheetConfigBtn.textContent = willShow ? '🙈' : '👁️';
+    toggleSheetConfigBtn.textContent = willShow ? '▼' : '▶';
     toggleSheetConfigBtn.title = willShow ? '숨기기' : '보이기';
   });
 }
