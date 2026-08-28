@@ -645,11 +645,12 @@
       <!-- 편집 패널 전체. 관리자 로그인 전에는 완전히 숨겨져 있다 -->
       <div id="adminPanel" style="display:none;">
 
-      <!-- 0. 연결된 구글 시트 변경 : 설정/일정/비밀번호를 읽어오는 스프레드시트
-           자체를 다른 시트로 바꾼다. 카테고리 관리와 같은 원리로, 이 값은
-           이 브라우저(localStorage)에만 저장되므로 다른 방문자에게도
-           반영하려면 4번 섹션처럼 값을 매실이에게 전달해서 재배포를
-           요청해야 한다. -->
+      <!-- 0. 연결된 구글 시트 변경 : 설정/일정을 읽어오는 스프레드시트 자체를
+           다른 시트로 바꾼다. 이 값은 (localStorage가 아니라) 고정된
+           마스터 시트(MASTER_SHEET)의 F~I열에 저장되므로, 관리자 비밀번호로
+           한 번 전환하면 코드 수정이나 재배포 없이 모든 방문자에게 즉시
+           반영된다. 관리자 비밀번호 자체는 항상 MASTER_SHEET의 E열에서만
+           확인하므로, 대상 시트를 바꿔도 로그인 비밀번호는 그대로 유지된다. -->
       <section class="section">
         <div class="section-title"><span class="num">🔗</span> 연결된 구글 시트</div>
         <p class="sheet-help">
@@ -660,9 +661,8 @@
           <code>#gid=숫자</code> 부분에서 확인할 수 있어요.
         </p>
         <p class="sheet-help">
-          ⚠️ 여기서 바꾸면 <b>지금 이 브라우저에서만</b> 바로 적용돼요.
-          다른 방문자에게도 보이게 하려면 아래 값을 매실이에게 전달해서
-          코드에 반영 + 재배포를 요청해주세요.
+          ✅ 여기서 전환하면 <b>모든 방문자에게 바로 반영</b>돼요 (재배포 필요 없음).
+          비워두고 저장하면 원래 기본 시트로 돌아갑니다.
         </p>
 
         <div class="field">
@@ -930,58 +930,45 @@ const DEFAULT_STATE = {
 };
 
 /* ---------------------------------------------------------------
-   연결된 구글 시트 설정
-   - 이 값들은 배포 시 한 번 정해두는 "설정"이라, 바뀔 일이 거의 없다.
-   - 반면 시트 "안의 내용"(비밀번호, 일정 행)은 관리자가 시트를 열어
-     자유롭게 바꿀 수 있고, 그 변경은 코드 수정이나 재배포 없이
-     방문자가 새로고침하는 즉시 반영된다.
+   연결된 구글 시트 설정 (마스터 시트 + 포인터 방식)
+   - MASTER_SHEET는 배포 시 한 번 정해두면 "영원히 바뀌지 않는 고정 주소"다.
+     관리자 비밀번호는 항상 이 마스터 시트의 E열에서만 읽는다 — 그래야
+     대상 시트를 이리저리 바꿔도 로그인 비밀번호가 함께 흔들리지 않는다.
+   - 마스터 시트의 설정 탭에 F~I열을 "포인터"로 추가로 쓴다:
+     F=연결대상 스프레드시트ID, G=연결대상 설정탭gid,
+     H=연결대상 일정탭gid, I=연결대상 Apps Script URL.
+     이 4칸이 비어있으면 "포인터 없음" = 마스터 시트 자신을 데이터 소스로 쓴다
+     (지금까지의 동작과 동일). 관리자가 이 값을 채우면(관리자 패널의
+     "연결된 구글 시트" 섹션) 그 순간부터 모든 방문자가 그 시트를 보게 된다 —
+     코드 수정이나 재배포가 필요 없다.
+   - effectiveSheetConfig는 "지금 실제로 읽어야 할 시트"를 나타내는 계산된
+     값으로, 매 동기화(syncSettingsFromSheet)마다 마스터 시트의 포인터 칸을
+     다시 읽어서 새로 계산된다 (localStorage 등 브라우저 로컬 저장 없음).
 --------------------------------------------------------------- */
-// 설정(컬러/배경/제목)과 관리자 비밀번호는 같은 탭의 같은 행에 함께 들어있다:
-// 메인컬러, 서브컬러, 캘린더제목, 배경이미지URL, 관리자비밀번호 (1행은 헤더)
-//
-// 이 값들은 더 이상 고정된 상수가 아니라 "기본값"이다. 관리자 모드의
-// "연결된 구글 시트" 섹션에서 다른 스프레드시트로 전환하면, 이 브라우저의
-// localStorage에 그 값이 저장되고 아래 sheetConfig가 그것을 대신 쓴다.
+const MASTER_SHEET = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1577649692' };
+
+// 구글 시트로 "쓰기"는 CSV 내보내기로 안 되기 때문에, 시트에 바인딩된
+// Apps Script 웹앱을 통해서만 가능하다. MASTER_SHEET에 바인딩된 웹앱 주소로,
+// 포인터(F~I열) 쓰기는 항상 이 URL로만 보낸다 (대상 시트가 바뀌어도 불변).
+const MASTER_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzrAhZ6LPPHTIVkvNOBttYtoTk1LKKnxq__MdYES8xrsU9KXyKIUZC6BTywkO3lIf_WMA/exec';
+
+// 포인터(F~I열)가 비어있을 때 사용하는 기본값 = 마스터 시트 자신
 const DEFAULT_SHEET_CONFIG = {
-  spreadsheetId: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o',
-  settingsGid:   '1577649692',
+  spreadsheetId: MASTER_SHEET.id,
+  settingsGid:   MASTER_SHEET.gid,
   scheduleGid:   '1998787329',
-  // 구글 시트로 "쓰기"는 CSV 내보내기로 안 되기 때문에, 시트에 바인딩된
-  // Apps Script 웹앱을 통해서만 가능하다.
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzrAhZ6LPPHTIVkvNOBttYtoTk1LKKnxq__MdYES8xrsU9KXyKIUZC6BTywkO3lIf_WMA/exec',
+  appsScriptUrl: MASTER_APPS_SCRIPT_URL,
 };
 
-const SHEET_CONFIG_STORAGE_KEY = 'streamerCalendarMaker.sheetConfig.v1';
+// 마스터 시트의 F~I열에 실제로 적혀있는 "원본" 포인터 값 (비어있을 수 있음).
+// 관리자 패널 입력창은 이 값을 그대로 보여준다 (비어있으면 "전환 안 함" 상태).
+let currentPointer = { spreadsheetId: '', settingsGid: '', scheduleGid: '', appsScriptUrl: '' };
 
-function loadSheetConfig() {
-  try {
-    const raw = localStorage.getItem(SHEET_CONFIG_STORAGE_KEY);
-    if (raw) {
-      const saved = JSON.parse(raw);
-      if (saved && saved.spreadsheetId && saved.settingsGid && saved.scheduleGid) {
-        return { ...DEFAULT_SHEET_CONFIG, ...saved };
-      }
-    }
-  } catch (err) {
-    // 저장된 값이 깨져있거나 접근할 수 없으면 기본값으로 시작
-  }
-  return { ...DEFAULT_SHEET_CONFIG };
-}
+// 지금 실제로 읽어야 할 시트 (포인터가 있으면 그 대상, 없으면 마스터 자신)
+let effectiveSheetConfig = { ...DEFAULT_SHEET_CONFIG };
 
-function saveSheetConfig(config) {
-  try {
-    localStorage.setItem(SHEET_CONFIG_STORAGE_KEY, JSON.stringify(config));
-  } catch (err) {
-    console.error('시트 설정 저장 실패:', err);
-  }
-}
-
-// 지금 이 브라우저가 실제로 사용 중인 시트 설정 (기본값 또는 관리자가 전환한 값)
-let sheetConfig = loadSheetConfig();
-
-function getSettingsSheet()    { return { id: sheetConfig.spreadsheetId, gid: sheetConfig.settingsGid }; }
-function getCredentialsSheet() { return getSettingsSheet(); }
-function getScheduleSheet()    { return { id: sheetConfig.spreadsheetId, gid: sheetConfig.scheduleGid }; }
+function getSettingsSheet()    { return { id: effectiveSheetConfig.spreadsheetId, gid: effectiveSheetConfig.settingsGid }; }
+function getScheduleSheet()    { return { id: effectiveSheetConfig.spreadsheetId, gid: effectiveSheetConfig.scheduleGid }; }
 
 /* 시트 전체 공유 URL을 그대로 붙여넣어도 되도록, URL/ID 어느 쪽이 들어와도
    스프레드시트 ID만 뽑아낸다 (URL이 아니면 입력값을 그대로 ID로 취급) */
@@ -1014,12 +1001,12 @@ async function fetchSheetCsv(sheet) {
      먼저 OPTIONS(프리플라이트) 요청을 보내는데, Apps Script 웹앱은 이걸
      처리하지 못한다. text/plain은 "단순 요청"이라 프리플라이트가 없다.
      (Apps Script 쪽에서는 e.postData.contents를 JSON.parse 해서 사용) */
-async function writeToSheet(action, payload) {
-  if (!sheetConfig.appsScriptUrl || sheetConfig.appsScriptUrl.includes('PASTE_YOUR')) {
+async function writeToUrl(url, action, payload) {
+  if (!url || url.includes('PASTE_YOUR')) {
     throw new Error('APPS_SCRIPT_NOT_CONFIGURED');
   }
   try {
-    await fetch(sheetConfig.appsScriptUrl, {
+    await fetch(url, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1030,6 +1017,18 @@ async function writeToSheet(action, payload) {
   }
   // Apps Script가 처리할 시간을 살짝 준다 (거의 즉시 처리되지만 여유를 둠)
   await new Promise((resolve) => setTimeout(resolve, 700));
+}
+
+/* 지금 "활성화된" 대상 시트(포인터가 가리키는 시트, 또는 마스터 자신)에 쓴다
+   — 일정 추가/삭제, 테마 설정 저장 등 데이터 자체를 바꾸는 액션용 */
+async function writeToSheet(action, payload) {
+  return writeToUrl(effectiveSheetConfig.appsScriptUrl, action, payload);
+}
+
+/* 항상 고정된 마스터 시트에만 쓴다 — 포인터(연결된 시트) 자체를
+   바꾸거나 초기화할 때 전용. 대상 시트가 뭐든 상관없이 늘 같은 곳으로 간다. */
+async function writeToMasterSheet(action, payload) {
+  return writeToUrl(MASTER_APPS_SCRIPT_URL, action, payload);
 }
 
 /* ---------------------------------------------------------------
@@ -1098,7 +1097,8 @@ async function tryAdminLogin() {
   adminLoginBtn.textContent = '확인 중...';
 
   try {
-    const csv = await fetchSheetCsv(getCredentialsSheet());
+    // 비밀번호는 대상 시트가 뭐든 상관없이 항상 고정된 마스터 시트에서만 읽는다
+    const csv = await fetchSheetCsv(MASTER_SHEET);
     const rows = parseCsv(csv);
     // 데이터 행(2행, index 1)의 5번째 칸(index 4) = 관리자비밀번호
     const dataRow = rows[1] || [];
@@ -1134,10 +1134,11 @@ adminPasswordInput.addEventListener('keydown', (e) => {
 
 /* ---------------------------------------------------------------
    연결된 구글 시트 변경 (관리자 전용)
-   - sheetConfig(스프레드시트 ID + 설정탭/일정탭 gid + Apps Script URL)를
-     바꾸고 localStorage에 저장한 뒤, 설정/일정을 새 시트에서 즉시 다시
-     불러온다. 카테고리 관리와 마찬가지로 이 브라우저에만 적용되므로,
-     모든 방문자에게 반영하려면 값을 매실이에게 전달해 재배포를 요청해야 한다.
+   - MASTER_SHEET(F~I열)에 저장된 "포인터"를 Apps Script로 써서 바꾼다.
+   - localStorage가 아니라 시트 자체에 저장되므로, 전환하는 즉시 모든
+     방문자에게 반영된다 (코드 수정 · 재배포 불필요).
+   - no-cors라 요청 성공 여부를 직접 알 수 없으므로, 다른 쓰기 액션들과
+     동일하게 "다시 읽어서 실제로 바뀌었는지" 확인하는 방식으로 검증한다.
 --------------------------------------------------------------- */
 const sheetConfigSpreadsheetInput = document.getElementById('sheetConfigSpreadsheetInput');
 const sheetConfigSettingsGidInput = document.getElementById('sheetConfigSettingsGidInput');
@@ -1147,21 +1148,14 @@ const switchSheetBtn = document.getElementById('switchSheetBtn');
 const resetSheetBtn = document.getElementById('resetSheetBtn');
 const sheetConfigStatus = document.getElementById('sheetConfigStatus');
 
+/* 관리자 패널 입력창에는 "실제 포인터 값"을 보여준다 — 비어있으면 아직
+   전환 안 한 상태(=마스터 시트 자신을 사용 중)라는 뜻이다. */
 function fillSheetConfigInputs() {
   if (!sheetConfigSpreadsheetInput) return;
-  sheetConfigSpreadsheetInput.value = sheetConfig.spreadsheetId;
-  sheetConfigSettingsGidInput.value = sheetConfig.settingsGid;
-  sheetConfigScheduleGidInput.value = sheetConfig.scheduleGid;
-  sheetConfigAppsScriptInput.value = sheetConfig.appsScriptUrl;
-}
-
-/* 새 설정을 적용하고, 그 시트를 기준으로 설정/일정을 다시 불러온다 */
-async function applySheetConfig(newConfig) {
-  sheetConfig = newConfig;
-  saveSheetConfig(sheetConfig);
-  fillSheetConfigInputs();
-  await syncSettingsFromSheet();
-  await syncSchedulesFromSheet();
+  sheetConfigSpreadsheetInput.value = currentPointer.spreadsheetId;
+  sheetConfigSettingsGidInput.value = currentPointer.settingsGid;
+  sheetConfigScheduleGidInput.value = currentPointer.scheduleGid;
+  sheetConfigAppsScriptInput.value = currentPointer.appsScriptUrl;
 }
 
 if (switchSheetBtn) {
@@ -1180,23 +1174,56 @@ if (switchSheetBtn) {
     sheetConfigStatus.className = 'sheet-status';
     sheetConfigStatus.textContent = '';
 
-    await applySheetConfig({ spreadsheetId, settingsGid, scheduleGid, appsScriptUrl });
+    try {
+      await writeToMasterSheet('updateSheetPointer', { spreadsheetId, settingsGid, scheduleGid, appsScriptUrl });
+      await syncSettingsFromSheet();
+      await syncSchedulesFromSheet();
 
-    sheetConfigStatus.classList.add('success');
-    sheetConfigStatus.textContent = '새 시트로 전환했어요 (이 브라우저에서만 적용됨) — 아래 동기화 상태를 확인해주세요';
-    showToast('구글 시트를 전환했어요 🔀');
-    switchSheetBtn.disabled = false;
-    switchSheetBtn.textContent = originalText;
+      const verified = currentPointer.spreadsheetId === spreadsheetId && currentPointer.settingsGid === settingsGid;
+      if (!verified) throw new Error('WRITE_NOT_VERIFIED');
+
+      sheetConfigStatus.classList.add('success');
+      sheetConfigStatus.textContent = '새 시트로 전환했어요 — 모든 방문자에게 반영됩니다';
+      showToast('구글 시트를 전환했어요 🔀');
+    } catch (err) {
+      console.error(err);
+      sheetConfigStatus.classList.add('error');
+      sheetConfigStatus.textContent =
+        err.message === 'APPS_SCRIPT_NOT_CONFIGURED' ? 'Apps Script 연동이 아직 설정되지 않았어요 (매실이에게 문의해주세요)'
+        : err.message === 'WRITE_NOT_VERIFIED' ? '전환이 반영되지 않았어요 — 로그아웃 후 다시 로그인해서 시도해주세요'
+        : '전환 실패 — 인터넷 연결과 Apps Script 배포 상태를 확인해주세요';
+      showToast('구글 시트 전환에 실패했어요');
+    } finally {
+      switchSheetBtn.disabled = false;
+      switchSheetBtn.textContent = originalText;
+    }
   });
 }
 
 if (resetSheetBtn) {
   resetSheetBtn.addEventListener('click', async () => {
-    try { localStorage.removeItem(SHEET_CONFIG_STORAGE_KEY); } catch (err) { /* 무시 */ }
-    await applySheetConfig({ ...DEFAULT_SHEET_CONFIG });
-    sheetConfigStatus.className = 'sheet-status success';
-    sheetConfigStatus.textContent = '기본 시트로 되돌렸어요';
-    showToast('기본 시트로 되돌렸어요 ↩️');
+    resetSheetBtn.disabled = true;
+    sheetConfigStatus.className = 'sheet-status';
+    sheetConfigStatus.textContent = '';
+
+    try {
+      await writeToMasterSheet('updateSheetPointer', { spreadsheetId: '', settingsGid: '', scheduleGid: '', appsScriptUrl: '' });
+      await syncSettingsFromSheet();
+      await syncSchedulesFromSheet();
+
+      if (currentPointer.spreadsheetId) throw new Error('WRITE_NOT_VERIFIED');
+
+      sheetConfigStatus.classList.add('success');
+      sheetConfigStatus.textContent = '기본 시트로 되돌렸어요 — 모든 방문자에게 반영됩니다';
+      showToast('기본 시트로 되돌렸어요 ↩️');
+    } catch (err) {
+      console.error(err);
+      sheetConfigStatus.classList.add('error');
+      sheetConfigStatus.textContent = '되돌리기가 반영되지 않았어요 — 다시 시도해주세요';
+      showToast('되돌리기에 실패했어요');
+    } finally {
+      resetSheetBtn.disabled = false;
+    }
   });
 }
 
@@ -1810,9 +1837,35 @@ async function syncSettingsFromSheet() {
   if (location.protocol === 'file:') return; // 이유는 syncSchedulesFromSheet 참고
 
   try {
-    const csv = await fetchSheetCsv(getSettingsSheet());
-    const rows = parseCsv(csv);
-    const dataRow = rows[1] || [];
+    // 1) 항상 고정된 마스터 시트를 먼저 읽어서 "지금 어떤 시트를 봐야 하는지"(포인터,
+    //    F~I열)와 관리자 비밀번호(E열)를 확인한다. 이 부분은 대상 시트가 뭐든
+    //    상관없이 항상 마스터 시트 기준이다.
+    const masterCsv = await fetchSheetCsv(MASTER_SHEET);
+    const masterRow = parseCsv(masterCsv)[1] || [];
+
+    currentPointer = {
+      spreadsheetId: (masterRow[5] || '').trim(),
+      settingsGid:   (masterRow[6] || '').trim(),
+      scheduleGid:   (masterRow[7] || '').trim(),
+      appsScriptUrl: (masterRow[8] || '').trim(),
+    };
+
+    effectiveSheetConfig = currentPointer.spreadsheetId
+      ? {
+          spreadsheetId: currentPointer.spreadsheetId,
+          settingsGid: currentPointer.settingsGid,
+          scheduleGid: currentPointer.scheduleGid,
+          appsScriptUrl: currentPointer.appsScriptUrl || MASTER_APPS_SCRIPT_URL,
+        }
+      : { ...DEFAULT_SHEET_CONFIG };
+
+    fillSheetConfigInputs();
+
+    // 2) 실제 테마/제목/배경 값은 "지금 활성화된" 시트에서 읽는다.
+    //    포인터가 없으면 이미 읽은 마스터 행을 그대로 재사용해서 fetch를 아낀다.
+    const dataRow = currentPointer.spreadsheetId
+      ? parseCsv(await fetchSheetCsv(getSettingsSheet()))[1] || []
+      : masterRow;
 
     const mainColor = (dataRow[0] || '').trim();
     const subColor = (dataRow[1] || '').trim();
@@ -1938,7 +1991,6 @@ exportConfigBtn.addEventListener('click', async () => {
 ================================================================ */
 applyAdminModeUI(isAdminUnlocked());
 loadState();
-fillSheetConfigInputs();
 renderCategories();
 renderCalendar();
 syncSettingsFromSheet();
