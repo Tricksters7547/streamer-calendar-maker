@@ -128,6 +128,23 @@
     font-size: 11px; font-weight: 800;
   }
 
+  /* 민감한 내용(구글 시트 URL/ID 등)을 실수로 노출하지 않도록 접어두는 섹션의
+     보이기/숨기기 토글 버튼. 제목 오른쪽 끝에 붙는다. */
+  .section-toggle-btn {
+    margin-left: auto;
+    width: 26px; height: 26px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .section-toggle-btn:hover { border-color: var(--main-color); color: var(--main-color); }
+
   .field { margin-bottom: 14px; }
   .field:last-child { margin-bottom: 0; }
   .field label {
@@ -652,39 +669,47 @@
            반영된다. 관리자 비밀번호 자체는 항상 MASTER_SHEET의 E열에서만
            확인하므로, 대상 시트를 바꿔도 로그인 비밀번호는 그대로 유지된다. -->
       <section class="section">
-        <div class="section-title"><span class="num">🔗</span> 연결된 구글 시트</div>
-        <p class="sheet-help">
-          이 캘린더가 읽고 쓰는 구글 시트를 다른 시트로 바꿀 수 있어요.
-          바꾸기 전에 새 시트가 <b>"링크가 있는 모든 사용자 - 뷰어"</b>로
-          공유되어 있고, 기존 시트와 <b>같은 탭 구성·열 구성</b>을 갖췄는지
-          확인해주세요. gid는 해당 탭을 클릭했을 때 주소창의
-          <code>#gid=숫자</code> 부분에서 확인할 수 있어요.
-        </p>
-        <p class="sheet-help">
-          ✅ 여기서 전환하면 <b>모든 방문자에게 바로 반영</b>돼요 (재배포 필요 없음).
-          비워두고 저장하면 원래 기본 시트로 돌아갑니다.
-        </p>
-
-        <div class="field">
-          <label for="sheetConfigSpreadsheetInput">구글 시트 URL 또는 ID</label>
-          <input type="text" id="sheetConfigSpreadsheetInput" placeholder="https://docs.google.com/spreadsheets/d/xxxx/edit" />
-        </div>
-        <div class="field">
-          <label for="sheetConfigSettingsGidInput">설정/비밀번호 탭 gid</label>
-          <input type="text" id="sheetConfigSettingsGidInput" placeholder="예: 1577649692" />
-        </div>
-        <div class="field">
-          <label for="sheetConfigScheduleGidInput">일정 탭 gid</label>
-          <input type="text" id="sheetConfigScheduleGidInput" placeholder="예: 1998787329" />
-        </div>
-        <div class="field">
-          <label for="sheetConfigAppsScriptInput">Apps Script 웹앱 URL</label>
-          <input type="text" id="sheetConfigAppsScriptInput" placeholder="https://script.google.com/macros/s/xxx/exec" />
+        <div class="section-title">
+          <span class="num">🔗</span> 연결된 구글 시트
+          <button type="button" class="section-toggle-btn" id="toggleSheetConfigBtn" title="보이기">👁️</button>
         </div>
 
-        <button type="button" class="add-btn" id="switchSheetBtn">🔀 이 시트로 전환</button>
-        <button type="button" class="add-btn" id="resetSheetBtn" style="margin-top:8px;">↩️ 기본 시트로 되돌리기</button>
-        <div class="sheet-status" id="sheetConfigStatus"></div>
+        <!-- 실수로 URL/ID가 눈에 띄지 않도록 기본은 숨김 상태.
+             관리자 모드로 들어와도 이 버튼을 직접 눌러야만 펼쳐진다. -->
+        <div id="sheetConfigBody" style="display:none;">
+          <p class="sheet-help">
+            이 캘린더가 읽고 쓰는 구글 시트를 다른 시트로 바꿀 수 있어요.
+            바꾸기 전에 새 시트가 <b>"링크가 있는 모든 사용자 - 뷰어"</b>로
+            공유되어 있고, 기존 시트와 <b>같은 탭 구성·열 구성</b>을 갖췄는지
+            확인해주세요. gid는 해당 탭을 클릭했을 때 주소창의
+            <code>#gid=숫자</code> 부분에서 확인할 수 있어요.
+          </p>
+          <p class="sheet-help">
+            ✅ 여기서 전환하면 <b>모든 방문자에게 바로 반영</b>돼요 (재배포 필요 없음).
+            비워두고 저장하면 원래 기본 시트로 돌아갑니다.
+          </p>
+
+          <div class="field">
+            <label for="sheetConfigSpreadsheetInput">구글 시트 URL 또는 ID</label>
+            <input type="text" id="sheetConfigSpreadsheetInput" placeholder="https://docs.google.com/spreadsheets/d/xxxx/edit" />
+          </div>
+          <div class="field">
+            <label for="sheetConfigSettingsGidInput">설정/비밀번호 탭 gid</label>
+            <input type="text" id="sheetConfigSettingsGidInput" placeholder="예: 1577649692" />
+          </div>
+          <div class="field">
+            <label for="sheetConfigScheduleGidInput">일정 탭 gid</label>
+            <input type="text" id="sheetConfigScheduleGidInput" placeholder="예: 1998787329" />
+          </div>
+          <div class="field">
+            <label for="sheetConfigAppsScriptInput">Apps Script 웹앱 URL</label>
+            <input type="text" id="sheetConfigAppsScriptInput" placeholder="https://script.google.com/macros/s/xxx/exec" />
+          </div>
+
+          <button type="button" class="add-btn" id="switchSheetBtn">🔀 이 시트로 전환</button>
+          <button type="button" class="add-btn" id="resetSheetBtn" style="margin-top:8px;">↩️ 기본 시트로 되돌리기</button>
+          <div class="sheet-status" id="sheetConfigStatus"></div>
+        </div>
       </section>
 
       <!-- 1. 설정 데이터 : 테마 컬러 / 배경 이미지 / 캘린더 제목은 구글 시트가
@@ -1147,6 +1172,19 @@ const sheetConfigAppsScriptInput = document.getElementById('sheetConfigAppsScrip
 const switchSheetBtn = document.getElementById('switchSheetBtn');
 const resetSheetBtn = document.getElementById('resetSheetBtn');
 const sheetConfigStatus = document.getElementById('sheetConfigStatus');
+const sheetConfigBody = document.getElementById('sheetConfigBody');
+const toggleSheetConfigBtn = document.getElementById('toggleSheetConfigBtn');
+
+// 관리자 모드로 들어와도 이 섹션은 기본으로 접혀있다 (실수로 URL/ID가
+// 눈에 띄지 않도록). 버튼을 눌러야만 펼쳐지고, 다시 누르면 접힌다.
+if (toggleSheetConfigBtn && sheetConfigBody) {
+  toggleSheetConfigBtn.addEventListener('click', () => {
+    const willShow = sheetConfigBody.style.display === 'none';
+    sheetConfigBody.style.display = willShow ? 'block' : 'none';
+    toggleSheetConfigBtn.textContent = willShow ? '🙈' : '👁️';
+    toggleSheetConfigBtn.title = willShow ? '숨기기' : '보이기';
+  });
+}
 
 /* 관리자 패널 입력창에는 "실제 포인터 값"을 보여준다 — 비어있으면 아직
    전환 안 한 상태(=마스터 시트 자신을 사용 중)라는 뜻이다. */
