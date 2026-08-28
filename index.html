@@ -645,6 +645,48 @@
       <!-- 편집 패널 전체. 관리자 로그인 전에는 완전히 숨겨져 있다 -->
       <div id="adminPanel" style="display:none;">
 
+      <!-- 0. 연결된 구글 시트 변경 : 설정/일정/비밀번호를 읽어오는 스프레드시트
+           자체를 다른 시트로 바꾼다. 카테고리 관리와 같은 원리로, 이 값은
+           이 브라우저(localStorage)에만 저장되므로 다른 방문자에게도
+           반영하려면 4번 섹션처럼 값을 매실이에게 전달해서 재배포를
+           요청해야 한다. -->
+      <section class="section">
+        <div class="section-title"><span class="num">🔗</span> 연결된 구글 시트</div>
+        <p class="sheet-help">
+          이 캘린더가 읽고 쓰는 구글 시트를 다른 시트로 바꿀 수 있어요.
+          바꾸기 전에 새 시트가 <b>"링크가 있는 모든 사용자 - 뷰어"</b>로
+          공유되어 있고, 기존 시트와 <b>같은 탭 구성·열 구성</b>을 갖췄는지
+          확인해주세요. gid는 해당 탭을 클릭했을 때 주소창의
+          <code>#gid=숫자</code> 부분에서 확인할 수 있어요.
+        </p>
+        <p class="sheet-help">
+          ⚠️ 여기서 바꾸면 <b>지금 이 브라우저에서만</b> 바로 적용돼요.
+          다른 방문자에게도 보이게 하려면 아래 값을 매실이에게 전달해서
+          코드에 반영 + 재배포를 요청해주세요.
+        </p>
+
+        <div class="field">
+          <label for="sheetConfigSpreadsheetInput">구글 시트 URL 또는 ID</label>
+          <input type="text" id="sheetConfigSpreadsheetInput" placeholder="https://docs.google.com/spreadsheets/d/xxxx/edit" />
+        </div>
+        <div class="field">
+          <label for="sheetConfigSettingsGidInput">설정/비밀번호 탭 gid</label>
+          <input type="text" id="sheetConfigSettingsGidInput" placeholder="예: 1577649692" />
+        </div>
+        <div class="field">
+          <label for="sheetConfigScheduleGidInput">일정 탭 gid</label>
+          <input type="text" id="sheetConfigScheduleGidInput" placeholder="예: 1998787329" />
+        </div>
+        <div class="field">
+          <label for="sheetConfigAppsScriptInput">Apps Script 웹앱 URL</label>
+          <input type="text" id="sheetConfigAppsScriptInput" placeholder="https://script.google.com/macros/s/xxx/exec" />
+        </div>
+
+        <button type="button" class="add-btn" id="switchSheetBtn">🔀 이 시트로 전환</button>
+        <button type="button" class="add-btn" id="resetSheetBtn" style="margin-top:8px;">↩️ 기본 시트로 되돌리기</button>
+        <div class="sheet-status" id="sheetConfigStatus"></div>
+      </section>
+
       <!-- 1. 설정 데이터 : 테마 컬러 / 배경 이미지 / 캘린더 제목은 구글 시트가
            정답이고, 모든 방문자에게 거기서 자동으로 반영된다. 아래 컬러
            피커/입력창은 어디까지나 "미리보기 + 시트에 저장" 도구다 —
@@ -896,14 +938,59 @@ const DEFAULT_STATE = {
 --------------------------------------------------------------- */
 // 설정(컬러/배경/제목)과 관리자 비밀번호는 같은 탭의 같은 행에 함께 들어있다:
 // 메인컬러, 서브컬러, 캘린더제목, 배경이미지URL, 관리자비밀번호 (1행은 헤더)
-const SETTINGS_SHEET    = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1577649692' };
-const CREDENTIALS_SHEET = SETTINGS_SHEET;
-const SCHEDULE_SHEET    = { id: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o', gid: '1998787329' };
+//
+// 이 값들은 더 이상 고정된 상수가 아니라 "기본값"이다. 관리자 모드의
+// "연결된 구글 시트" 섹션에서 다른 스프레드시트로 전환하면, 이 브라우저의
+// localStorage에 그 값이 저장되고 아래 sheetConfig가 그것을 대신 쓴다.
+const DEFAULT_SHEET_CONFIG = {
+  spreadsheetId: '1LrZ-RqPqQcHITn1aiTAyI6CNtf0y0b6gMDRyvC6UK2o',
+  settingsGid:   '1577649692',
+  scheduleGid:   '1998787329',
+  // 구글 시트로 "쓰기"는 CSV 내보내기로 안 되기 때문에, 시트에 바인딩된
+  // Apps Script 웹앱을 통해서만 가능하다.
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzrAhZ6LPPHTIVkvNOBttYtoTk1LKKnxq__MdYES8xrsU9KXyKIUZC6BTywkO3lIf_WMA/exec',
+};
 
-// 구글 시트로 "쓰기"는 CSV 내보내기로 안 되기 때문에, 시트에 바인딩된
-// Apps Script 웹앱을 통해서만 가능하다. 이 URL은 배포 후 채워 넣는다.
-// (설정 방법은 관리자에게 별도로 안내됨)
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzrAhZ6LPPHTIVkvNOBttYtoTk1LKKnxq__MdYES8xrsU9KXyKIUZC6BTywkO3lIf_WMA/exec';
+const SHEET_CONFIG_STORAGE_KEY = 'streamerCalendarMaker.sheetConfig.v1';
+
+function loadSheetConfig() {
+  try {
+    const raw = localStorage.getItem(SHEET_CONFIG_STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved && saved.spreadsheetId && saved.settingsGid && saved.scheduleGid) {
+        return { ...DEFAULT_SHEET_CONFIG, ...saved };
+      }
+    }
+  } catch (err) {
+    // 저장된 값이 깨져있거나 접근할 수 없으면 기본값으로 시작
+  }
+  return { ...DEFAULT_SHEET_CONFIG };
+}
+
+function saveSheetConfig(config) {
+  try {
+    localStorage.setItem(SHEET_CONFIG_STORAGE_KEY, JSON.stringify(config));
+  } catch (err) {
+    console.error('시트 설정 저장 실패:', err);
+  }
+}
+
+// 지금 이 브라우저가 실제로 사용 중인 시트 설정 (기본값 또는 관리자가 전환한 값)
+let sheetConfig = loadSheetConfig();
+
+function getSettingsSheet()    { return { id: sheetConfig.spreadsheetId, gid: sheetConfig.settingsGid }; }
+function getCredentialsSheet() { return getSettingsSheet(); }
+function getScheduleSheet()    { return { id: sheetConfig.spreadsheetId, gid: sheetConfig.scheduleGid }; }
+
+/* 시트 전체 공유 URL을 그대로 붙여넣어도 되도록, URL/ID 어느 쪽이 들어와도
+   스프레드시트 ID만 뽑아낸다 (URL이 아니면 입력값을 그대로 ID로 취급) */
+function extractSpreadsheetId(input) {
+  const s = (input || '').trim();
+  if (!s) return '';
+  const m = s.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : s;
+}
 
 function sheetCsvUrl(sheet) {
   return `https://docs.google.com/spreadsheets/d/${sheet.id}/export?format=csv&gid=${sheet.gid}`;
@@ -928,11 +1015,11 @@ async function fetchSheetCsv(sheet) {
      처리하지 못한다. text/plain은 "단순 요청"이라 프리플라이트가 없다.
      (Apps Script 쪽에서는 e.postData.contents를 JSON.parse 해서 사용) */
 async function writeToSheet(action, payload) {
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_YOUR')) {
+  if (!sheetConfig.appsScriptUrl || sheetConfig.appsScriptUrl.includes('PASTE_YOUR')) {
     throw new Error('APPS_SCRIPT_NOT_CONFIGURED');
   }
   try {
-    await fetch(APPS_SCRIPT_URL, {
+    await fetch(sheetConfig.appsScriptUrl, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1011,7 +1098,7 @@ async function tryAdminLogin() {
   adminLoginBtn.textContent = '확인 중...';
 
   try {
-    const csv = await fetchSheetCsv(CREDENTIALS_SHEET);
+    const csv = await fetchSheetCsv(getCredentialsSheet());
     const rows = parseCsv(csv);
     // 데이터 행(2행, index 1)의 5번째 칸(index 4) = 관리자비밀번호
     const dataRow = rows[1] || [];
@@ -1044,6 +1131,74 @@ adminLoginBtn.addEventListener('click', tryAdminLogin);
 adminPasswordInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') tryAdminLogin();
 });
+
+/* ---------------------------------------------------------------
+   연결된 구글 시트 변경 (관리자 전용)
+   - sheetConfig(스프레드시트 ID + 설정탭/일정탭 gid + Apps Script URL)를
+     바꾸고 localStorage에 저장한 뒤, 설정/일정을 새 시트에서 즉시 다시
+     불러온다. 카테고리 관리와 마찬가지로 이 브라우저에만 적용되므로,
+     모든 방문자에게 반영하려면 값을 매실이에게 전달해 재배포를 요청해야 한다.
+--------------------------------------------------------------- */
+const sheetConfigSpreadsheetInput = document.getElementById('sheetConfigSpreadsheetInput');
+const sheetConfigSettingsGidInput = document.getElementById('sheetConfigSettingsGidInput');
+const sheetConfigScheduleGidInput = document.getElementById('sheetConfigScheduleGidInput');
+const sheetConfigAppsScriptInput = document.getElementById('sheetConfigAppsScriptInput');
+const switchSheetBtn = document.getElementById('switchSheetBtn');
+const resetSheetBtn = document.getElementById('resetSheetBtn');
+const sheetConfigStatus = document.getElementById('sheetConfigStatus');
+
+function fillSheetConfigInputs() {
+  if (!sheetConfigSpreadsheetInput) return;
+  sheetConfigSpreadsheetInput.value = sheetConfig.spreadsheetId;
+  sheetConfigSettingsGidInput.value = sheetConfig.settingsGid;
+  sheetConfigScheduleGidInput.value = sheetConfig.scheduleGid;
+  sheetConfigAppsScriptInput.value = sheetConfig.appsScriptUrl;
+}
+
+/* 새 설정을 적용하고, 그 시트를 기준으로 설정/일정을 다시 불러온다 */
+async function applySheetConfig(newConfig) {
+  sheetConfig = newConfig;
+  saveSheetConfig(sheetConfig);
+  fillSheetConfigInputs();
+  await syncSettingsFromSheet();
+  await syncSchedulesFromSheet();
+}
+
+if (switchSheetBtn) {
+  switchSheetBtn.addEventListener('click', async () => {
+    const spreadsheetId = extractSpreadsheetId(sheetConfigSpreadsheetInput.value);
+    const settingsGid = sheetConfigSettingsGidInput.value.trim();
+    const scheduleGid = sheetConfigScheduleGidInput.value.trim();
+    const appsScriptUrl = sheetConfigAppsScriptInput.value.trim();
+
+    if (!spreadsheetId) { showToast('구글 시트 URL 또는 ID를 입력해주세요'); return; }
+    if (!settingsGid || !scheduleGid) { showToast('설정 탭 / 일정 탭의 gid를 모두 입력해주세요'); return; }
+
+    switchSheetBtn.disabled = true;
+    const originalText = switchSheetBtn.textContent;
+    switchSheetBtn.textContent = '전환 중...';
+    sheetConfigStatus.className = 'sheet-status';
+    sheetConfigStatus.textContent = '';
+
+    await applySheetConfig({ spreadsheetId, settingsGid, scheduleGid, appsScriptUrl });
+
+    sheetConfigStatus.classList.add('success');
+    sheetConfigStatus.textContent = '새 시트로 전환했어요 (이 브라우저에서만 적용됨) — 아래 동기화 상태를 확인해주세요';
+    showToast('구글 시트를 전환했어요 🔀');
+    switchSheetBtn.disabled = false;
+    switchSheetBtn.textContent = originalText;
+  });
+}
+
+if (resetSheetBtn) {
+  resetSheetBtn.addEventListener('click', async () => {
+    try { localStorage.removeItem(SHEET_CONFIG_STORAGE_KEY); } catch (err) { /* 무시 */ }
+    await applySheetConfig({ ...DEFAULT_SHEET_CONFIG });
+    sheetConfigStatus.className = 'sheet-status success';
+    sheetConfigStatus.textContent = '기본 시트로 되돌렸어요';
+    showToast('기본 시트로 되돌렸어요 ↩️');
+  });
+}
 
 adminLogoutBtn.addEventListener('click', () => {
   try { localStorage.removeItem(ADMIN_SESSION_KEY); } catch (err) { /* 무시 */ }
@@ -1508,7 +1663,7 @@ async function syncSchedulesFromSheet() {
   setSyncStatusText('동기화 중...');
 
   try {
-    const csv = await fetchSheetCsv(SCHEDULE_SHEET);
+    const csv = await fetchSheetCsv(getScheduleSheet());
     const rows = parseCsv(csv);
 
     const newSchedules = {};
@@ -1655,7 +1810,7 @@ async function syncSettingsFromSheet() {
   if (location.protocol === 'file:') return; // 이유는 syncSchedulesFromSheet 참고
 
   try {
-    const csv = await fetchSheetCsv(SETTINGS_SHEET);
+    const csv = await fetchSheetCsv(getSettingsSheet());
     const rows = parseCsv(csv);
     const dataRow = rows[1] || [];
 
@@ -1783,6 +1938,7 @@ exportConfigBtn.addEventListener('click', async () => {
 ================================================================ */
 applyAdminModeUI(isAdminUnlocked());
 loadState();
+fillSheetConfigInputs();
 renderCategories();
 renderCalendar();
 syncSettingsFromSheet();
