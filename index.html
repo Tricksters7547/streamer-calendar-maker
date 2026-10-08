@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>스트리머 월간 캘린더 메이커</title>
+<title>설홍 방송 일정표</title>
 
 <!-- ============================================================
      외부 리소스
-     1) Pretendard : 한글 UI에 최적화된 모던 웹폰트 (치지직/트위치 계열 UI에서 많이 쓰이는 톤)
-     2) html2canvas : 완성된 캘린더 DOM을 이미지(PNG)로 캡처해서 다운로드시키기 위한 라이브러리
+     1) Pretendard : 한글 UI 웹폰트
+     2) html2canvas : 완성된 캘린더 DOM을 PNG로 저장
      ============================================================ -->
 <link rel="stylesheet" as="style" crossorigin
   href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
@@ -16,115 +16,334 @@
 
 <style>
   /* ============================================================
-     0. 디자인 토큰 (CSS 변수)
-     - --main-color / --sub-color 는 유저가 컬러피커로 바꾸는 즉시
-       JS에서 document.documentElement.style.setProperty() 로 갱신된다.
-     - 컴포넌트들은 항상 이 변수를 참조하도록 만들어서
-       "실시간 테마 변경"이 CSS 재계산만으로 자연스럽게 일어나게 한다.
+     0. 디자인 토큰
+     - 라이트 테마 (흰 카드 + 은은한 배경 + 둥근 모서리)
+     - 포인트 색은 진한 빨강(--main-color) + 형광 초록(--sub-color).
+       구글 시트 설정값이 있으면 JS(applyThemeColors)가 덮어쓴다.
+     - --main-rgb / --sub-rgb 는 같은 색의 "R, G, B" 값으로, 연한 배경·테두리
+       (rgba(var(--main-rgb), .1) 같은 표기)를 테마 색에 맞춰 자동으로 만들 때
+       쓴다. 이 값도 applyThemeColors 가 같이 갱신한다.
+     - 빨강과 초록을 그라데이션으로 섞으면 중간이 탁한 갈색이 되므로,
+       두 색이 만나는 곳은 부드럽게 섞지 않고 "띠"로 나란히 놓는다.
      ============================================================ */
   :root {
-    /* 네이티브 폼 컨트롤(특히 select의 드롭다운 목록)을 다크 팔레트로 렌더링하게 함
-       -> 브라우저 기본 흰 배경/흰 글자 조합으로 안 보이는 문제를 근본적으로 방지 */
-    color-scheme: dark;
+    color-scheme: light;
 
-    --main-color: #b98cf9;     /* 포인트 컬러 (기본값: 바이올렛) */
-    --sub-color: #ff8fc7;      /* 서브 컬러 (기본값: 핑크) */
+    --main-color: #db2452;     /* 진한 빨강 (시트 값으로 덮어써짐) */
+    --sub-color: #7af07c;      /* 형광 초록 (시트 값으로 덮어써짐) */
+    --main-rgb: 219, 36, 82;
+    --sub-rgb: 122, 240, 124;
 
-    --bg-0: #0b0b12;           /* 페이지 배경 (가장 어두운 톤) */
-    --bg-1: #14141f;           /* 패널 배경 */
-    --line: rgba(255, 255, 255, 0.09);
-    --text-main: #f4f3f8;
-    --text-dim: #9c9ab0;
+    --page-base: #fbf9fb;      /* 페이지 바탕 */
+    --card: rgba(255, 255, 255, 0.96);
+    --card-line: #f0e9ef;
+    --line: #e8dfe7;
+    --muted: #f8f4f8;
+    --ink: #2a2330;            /* 진한 글자 */
+    --text-main: #3a3340;
+    --text-dim: #7b7284;
+    --sun: #e0425f;
+    --sat: #4f86d9;
 
-    --radius-lg: 22px;
+    --shadow-card: 0 8px 26px rgba(60, 30, 50, 0.08);
+    --shadow-head: 0 5px 22px rgba(60, 30, 50, 0.07);
+
+    --radius-lg: 18px;
     --radius-md: 14px;
-    --radius-sm: 9px;
+    --radius-sm: 10px;
   }
 
   * { box-sizing: border-box; }
 
-  html, body {
+  html { background: var(--page-base); }
+  body {
     margin: 0;
-    height: 100%;
-    background: radial-gradient(circle at 15% 10%, rgba(185, 140, 249, 0.16), transparent 45%),
-                radial-gradient(circle at 85% 90%, rgba(255, 143, 199, 0.14), transparent 45%),
-                var(--bg-0);
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 6% 0%, rgba(var(--main-rgb), 0.10), transparent 42%),
+      radial-gradient(circle at 98% 100%, rgba(var(--sub-rgb), 0.22), transparent 46%),
+      var(--page-base);
+    background-attachment: fixed;
     color: var(--text-main);
-    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Malgun Gothic", sans-serif;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* 스크롤바를 얇고 테마 컬러에 맞게 커스텀 (좌측 제어판용) */
   ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-thumb { background: var(--main-color); border-radius: 10px; opacity: .5; }
+  ::-webkit-scrollbar-thumb { background: #e0d3dc; border-radius: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
 
   /* ============================================================
-     1. 전체 레이아웃 : 좌측 제어판 + 우측 캘린더 스테이지
+     1. 전체 레이아웃 : 상단 헤더 + (캘린더 카드 | 관리자 카드)
      ============================================================ */
-  .app {
+  .site {
+    max-width: 1640px;
+    margin: 0 auto;
+    padding: 14px 16px 48px;
+  }
+
+  /* ---------- 상단 고정 헤더 ---------- */
+  .site-header {
+    position: sticky;
+    top: 12px;
+    z-index: 50;
     display: flex;
-    min-height: 100vh;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid var(--card-line);
+    border-radius: 15px;
+    box-shadow: var(--shadow-head);
+    margin-bottom: 18px;
   }
-
-  /* ---------- 좌측 : 스트리머 테마 커스텀 제어판 ---------- */
-  .control-panel {
-    width: 380px;
-    flex-shrink: 0;
-    padding: 36px 26px 60px;
-    background: rgba(255, 255, 255, 0.03);
-    border-right: 1px solid var(--line);
-    backdrop-filter: blur(18px);
-    overflow-y: auto;
-    max-height: 100vh;
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
   }
-
   .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
+    gap: 12px;
+    min-width: 0;
   }
-  .brand .dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--main-color), var(--sub-color));
-    box-shadow: 0 0 10px var(--main-color);
+  .brand .avatar {
+    width: 40px; height: 40px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--main-color);
+    border: 2px solid #fff;
+    /* 형광 초록 테두리 링 */
+    box-shadow: 0 0 0 2px var(--sub-color), 0 3px 10px rgba(var(--main-rgb), 0.28);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 16px;
   }
   .brand h1 {
-    font-size: 17px;
     margin: 0;
-    letter-spacing: -0.02em;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: var(--main-color);
   }
-  .brand span {
+  .brand small {
     display: block;
-    font-size: 12px;
+    margin-top: 2px;
+    font-size: 11.5px;
+    font-weight: 600;
     color: var(--text-dim);
-    margin-top: 4px;
-    margin-bottom: 30px;
   }
 
-  /* 제어판 내부 섹션 공통 스타일 */
+  /* ---------- 관리자 접속 여부 (제목 바로 옆) ---------- */
+  .admin-wrap { position: relative; flex-shrink: 0; }
+  .admin-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 50px;
+    background: #fff;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .admin-pill:hover { border-color: var(--main-color); color: var(--main-color); }
+  .admin-pill .state-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #cfc6d3;
+  }
+  .admin-pill .when-admin { display: none; }
+  body.is-admin .admin-pill {
+    background: rgba(var(--main-rgb), 0.08);
+    border-color: rgba(var(--main-rgb), 0.35);
+    color: var(--main-color);
+  }
+  body.is-admin .admin-pill .state-dot {
+    background: var(--sub-color);
+    box-shadow: 0 0 0 3px rgba(var(--sub-rgb), 0.4);
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  body.is-admin .admin-pill .when-locked { display: none; }
+  body.is-admin .admin-pill .when-admin { display: inline; }
+
+  /* 로그인 / 로그아웃 팝오버 : 알약을 누르면 아래로 펼쳐진다 */
+  .admin-popover {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: calc(100% + 12px);
+    width: min(320px, calc(100vw - 32px));
+    padding: 16px;
+    background: #fff;
+    border: 1px solid var(--card-line);
+    border-radius: var(--radius-md);
+    box-shadow: 0 16px 40px rgba(60, 30, 50, 0.16);
+    z-index: 80;
+  }
+  .admin-popover.open { display: block; }
+  .admin-popover .sheet-help { margin-bottom: 10px; }
+  .admin-popover .add-btn { margin-top: 10px; }
+
+  .header-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    padding: 7px 14px;
+    border-radius: 50px;
+    background: rgba(var(--main-rgb), 0.07);
+    border: 1px solid rgba(var(--main-rgb), 0.28);
+    color: var(--main-color);
+    font-size: 12.5px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .header-pill .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--main-color);
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.35; } }
+
+  /* ---------- 히어로 띠 ---------- */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    /* 원래 크기의 절반 정도로 줄인 얇은 띠 */
+    padding: 14px 22px;
+    margin-bottom: 18px;
+    border-radius: var(--radius-lg);
+    /* 빨강 → 흰색 → 초록 : 가운데를 흰색으로 비워서 두 색이 탁하게 섞이지 않게 함 */
+    background: linear-gradient(115deg, rgba(var(--main-rgb), 0.11) 0%, #ffffff 50%, rgba(var(--sub-rgb), 0.30) 100%);
+    border: 1px solid var(--card-line);
+  }
+  .hero .eyebrow {
+    margin: 0 0 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--text-dim);
+  }
+  .hero h2 {
+    margin: 0;
+    font-size: clamp(18px, 2.6vw, 21px);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    color: var(--main-color);
+  }
+  .hero p {
+    margin: 3px 0 0;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  /* 관리자가 문구를 바꿀 수 있는 말풍선(#heroTag). 띠의 오른쪽 가운데에 붙는다 */
+  .hero .hero-tag {
+    position: absolute;
+    right: 18px; top: 50%;
+    transform: translateY(-50%);
+    max-width: 40%;
+    padding: 6px 12px;
+    border-radius: 50px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid var(--card-line);
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 방문자에게는 캘린더만 크게, 관리자일 때만 오른쪽에 관리자 카드가 붙는다 */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1280px);
+    justify-content: center;
+    gap: 18px;
+    align-items: start;
+  }
+  body.is-admin .layout {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    justify-content: stretch;
+  }
+
+  /* ---------- 공통 카드 ---------- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    padding: 20px;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .card-head h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .card-head h3 svg { color: var(--main-color); flex-shrink: 0; }
+  .card-head .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* ============================================================
+     2. 관리자(제어판) 카드 — 관리자로 접속했을 때만 보인다
+     ============================================================ */
+  .control-panel {
+    display: none;
+    position: sticky;
+    top: 90px;
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+  }
+  body.is-admin .control-panel { display: block; }
+
   .section {
-    margin-bottom: 30px;
-    padding-bottom: 26px;
+    margin-bottom: 22px;
+    padding-bottom: 20px;
     border-bottom: 1px solid var(--line);
   }
-  .section:last-child { border-bottom: none; }
+  .section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
   .section-title {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
-    color: var(--text-main);
-    margin-bottom: 14px;
+    color: var(--ink);
+    margin-bottom: 12px;
   }
   .section-title .num {
-    width: 20px; height: 20px;
-    border-radius: 6px;
-    background: linear-gradient(135deg, var(--main-color), var(--sub-color));
-    color: #14141f;
-    display: flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 22px;
+    padding: 0 6px;
+    border-radius: 50px;
+    background: rgba(var(--main-rgb), 0.10);
+    color: var(--main-color);
+    display: inline-flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 800;
   }
 
@@ -132,130 +351,110 @@
      보이기/숨기기 토글 버튼. 제목 오른쪽 끝에 붙는다. */
   .section-toggle-btn {
     margin-left: auto;
-    width: 26px; height: 26px;
+    width: 28px; height: 28px;
     flex-shrink: 0;
     border-radius: 50%;
     border: 1px solid var(--line);
-    background: rgba(255, 255, 255, 0.05);
+    background: #fff;
     color: var(--text-dim);
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
     display: flex; align-items: center; justify-content: center;
     transition: border-color 0.15s, color 0.15s;
   }
   .section-toggle-btn:hover { border-color: var(--main-color); color: var(--main-color); }
 
-  .field { margin-bottom: 14px; }
+  .field { margin-bottom: 12px; }
   .field:last-child { margin-bottom: 0; }
-  .field label {
+  .field label, .color-field label {
     display: block;
     font-size: 12px;
+    font-weight: 600;
     color: var(--text-dim);
-    margin-bottom: 7px;
+    margin-bottom: 6px;
   }
 
-  /* 컬러피커 2개를 나란히 배치 (설정 미리보기 / 카테고리 추가 폼에서 사용) */
-  .color-row { display: flex; gap: 12px; }
+  .color-row { display: flex; gap: 10px; margin-bottom: 12px; }
   .color-field { flex: 1; }
   input[type="color"] {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
-    height: 42px;
+    height: 40px;
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
-    background: transparent;
+    background: #fff;
     cursor: pointer;
     padding: 0;
   }
   input[type="color"]::-webkit-color-swatch-wrapper { padding: 4px; }
   input[type="color"]::-webkit-color-swatch { border: none; border-radius: 7px; }
 
-  /* 공통 텍스트 입력 / 셀렉트 스타일 */
-  input[type="text"], select {
+  input[type="text"], input[type="password"], select {
     width: 100%;
     padding: 10px 12px;
-    background: rgba(255, 255, 255, 0.04);
+    background: #fff;
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
-    color: var(--text-main);
+    color: var(--ink);
     font-family: inherit;
     font-size: 13px;
     outline: none;
     transition: 0.15s;
   }
-  input[type="text"]:focus, select:focus {
+  input[type="text"]:focus, input[type="password"]:focus, select:focus {
     border-color: var(--main-color);
-    box-shadow: 0 0 0 3px rgba(185, 140, 249, 0.18);
+    box-shadow: 0 0 0 3px rgba(var(--main-rgb), 0.15);
   }
-  input[type="text"]::placeholder { color: #6b6980; }
+  input::placeholder { color: #b0a6b6; }
 
-  /* "일정 데이터" 폼의 날짜 선택 필드 — 눈에 띄는 카드 느낌으로 강조 */
   input.date-picker {
     width: 100%;
-    padding: 12px 14px;
-    background: linear-gradient(135deg, rgba(185, 140, 249, 0.10), rgba(255, 143, 199, 0.08));
-    border: 1.5px solid var(--line);
+    padding: 11px 13px;
+    background: var(--muted);
+    border: 1px solid var(--line);
     border-radius: var(--radius-sm);
-    color: var(--text-main);
+    color: var(--ink);
     font-family: inherit;
-    font-size: 14.5px;
+    font-size: 14px;
     font-weight: 700;
-    letter-spacing: 0.02em;
     outline: none;
     cursor: pointer;
     transition: 0.15s;
   }
-  input.date-picker:hover { border-color: rgba(255, 255, 255, 0.3); }
+  input.date-picker:hover { border-color: #d6c9d3; }
   input.date-picker:focus {
     border-color: var(--main-color);
-    box-shadow: 0 0 0 3px rgba(185, 140, 249, 0.18);
+    box-shadow: 0 0 0 3px rgba(var(--main-rgb), 0.15);
   }
-  /* 브라우저 기본 달력 아이콘은 어두운 배경에서 잘 안 보이므로 반전시키고,
-     호버 시 포인트 컬러 배지처럼 보이게 한다 */
-  input.date-picker::-webkit-calendar-picker-indicator {
-    filter: invert(1) brightness(1.4);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 6px;
-    transition: background 0.15s, filter 0.15s;
-  }
-  input.date-picker::-webkit-calendar-picker-indicator:hover {
-    background: var(--main-color);
-    filter: invert(0) brightness(1);
-  }
+  input.date-picker::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
   .date-picker-hint {
     margin: 6px 0 0;
     font-size: 11px;
     color: var(--text-dim);
   }
 
-  /* color-scheme: dark 를 지원하지 않는 브라우저를 위한 보조 장치
-     -> 드롭다운을 열었을 때 옵션 목록의 배경/글자색을 명시적으로 지정 */
-  select option {
-    background-color: #1c1c2a;
-    color: var(--text-main);
-  }
-
-  /* 카테고리 관리 : 현재 카테고리 목록(칩) */
+  /* 카테고리 칩 */
   .category-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
+    gap: 7px;
+    margin-bottom: 12px;
   }
   .category-chip {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 8px 6px 10px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.05);
+    padding: 5px 8px 5px 10px;
+    border-radius: 50px;
+    background: var(--muted);
     border: 1px solid var(--line);
     font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
   }
   .category-chip .swatch {
-    width: 10px; height: 10px;
+    width: 9px; height: 9px;
     border-radius: 50%;
     flex-shrink: 0;
   }
@@ -266,19 +465,14 @@
     line-height: 1;
     padding: 2px;
   }
-  .category-chip .remove:hover { color: #ff8a8a; }
+  .category-chip .remove:hover { color: var(--main-color); }
 
-  /* 카테고리 관리 : 새 카테고리 추가 행 (컬러피커 + 이름 입력 + 추가버튼) */
   .add-category-row {
     display: flex;
     gap: 8px;
     align-items: center;
   }
-  .add-category-row input[type="color"] {
-    width: 42px;
-    height: 38px;
-    flex-shrink: 0;
-  }
+  .add-category-row input[type="color"] { width: 42px; height: 38px; flex-shrink: 0; }
   .add-category-row input[type="text"] { flex: 1; }
 
   .icon-btn {
@@ -286,111 +480,129 @@
     flex-shrink: 0;
     border: none;
     border-radius: var(--radius-sm);
-    background: linear-gradient(135deg, var(--main-color), var(--sub-color));
-    color: #14141f;
+    background: var(--main-color);
+    color: #fff;
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 700;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    transition: transform 0.12s;
+    transition: transform 0.12s, filter 0.12s;
   }
-  .icon-btn:hover { transform: translateY(-1px); }
+  .icon-btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
 
+  /* 기본 버튼 : 흰 바탕 + 테두리 알약 */
   .add-btn {
     width: 100%;
-    margin-top: 14px;
-    padding: 12px;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: linear-gradient(135deg, var(--main-color), var(--sub-color));
-    color: #14141f;
-    font-weight: 800;
-    font-size: 13.5px;
+    margin-top: 10px;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: 50px;
+    background: #fff;
+    color: var(--ink);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 13px;
     cursor: pointer;
-    transition: transform 0.12s, opacity 0.12s;
+    transition: transform 0.12s, border-color 0.12s, color 0.12s;
   }
-  .add-btn:hover { transform: translateY(-1px); }
-  .add-btn:active { transform: translateY(0); opacity: 0.85; }
+  .add-btn:hover { transform: translateY(-1px); border-color: var(--main-color); color: var(--main-color); }
+  .add-btn:active { transform: translateY(0); }
   .add-btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
-
-  /* 구글 시트 연동 섹션 전용 텍스트 */
-  .sheet-help {
-    font-size: 11.5px;
-    line-height: 1.6;
-    color: var(--text-dim);
-    margin: 0 0 14px;
+  /* 주요 동작 버튼은 진한 빨강으로 채운다 */
+  #adminLoginBtn, #saveSettingsToSheetBtn, #addScheduleToSheetBtn, #switchSheetBtn {
+    background: var(--main-color);
+    border-color: transparent;
+    color: #fff;
   }
-  .sheet-help b { color: var(--text-main); }
+  #adminLoginBtn:hover, #saveSettingsToSheetBtn:hover, #addScheduleToSheetBtn:hover, #switchSheetBtn:hover {
+    color: #fff;
+    filter: brightness(1.07);
+  }
+
+  .sheet-help {
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    margin: 0 0 12px;
+  }
+  .sheet-help b { color: var(--ink); }
   .sheet-help code {
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--muted);
+    border: 1px solid var(--line);
     padding: 1px 5px;
-    border-radius: 4px;
-    color: var(--text-main);
+    border-radius: 5px;
+    color: var(--ink);
   }
 
   .sheet-status {
-    margin-top: 10px;
-    font-size: 11.5px;
+    margin-top: 8px;
+    font-size: 12px;
     color: var(--text-dim);
     min-height: 14px;
   }
-  .sheet-status.error { color: #ff8a8a; }
-  .sheet-status.success { color: var(--main-color); }
+  .sheet-status.error { color: var(--main-color); }
+  .sheet-status.success { color: #1f9d55; }
 
-  /* ---------- 우측 : 캘린더 출력 스테이지 ---------- */
+  /* ============================================================
+     3. 캘린더 카드
+     ============================================================ */
   .calendar-stage {
-    flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 22px;
-    padding: 48px 24px;
+    gap: 14px;
   }
 
-  .title-input-wrap {
-    width: min(1240px, 97%);
-  }
-  .cal-title-input {
-    width: 100%;
-    background: transparent;
+  input.cal-title-input {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+    text-align: right;
     border: none;
-    border-bottom: 1px dashed var(--line);
+    box-shadow: none;
+    background: transparent;
     color: var(--text-dim);
-    font-size: 12.5px;
-    padding: 6px 2px;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 0;
     outline: none;
   }
-  .cal-title-input:focus { border-color: var(--main-color); color: var(--text-main); }
 
-  /* html2canvas로 캡처되는 실제 대상 영역
-     -> 배경이미지는 여기 background-image로 적용되고,
-        그 위에 반투명 그리드가 얹히는 구조 */
+  /* html2canvas가 캡처하는 영역.
+     ※ 캡처 품질을 위해 이 안에서는 backdrop-filter / color-mix 를 쓰지 않는다. */
   #calendar-capture {
     position: relative;
-    width: min(1240px, 97%);
+    width: 100%;
     aspect-ratio: 4 / 3;
     border-radius: var(--radius-lg);
-    border: 3px solid var(--main-color);
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 30px 60px -20px rgba(0,0,0,0.6), 0 0 40px -10px var(--main-color);
+    border: 1px solid var(--card-line);
+    box-shadow: var(--shadow-card);
     overflow: hidden;
-    background-color: #1b1b28;   /* 배경 이미지가 없을 때 기본 색 */
+    background-color: #ffffff;
     background-size: cover;
     background-position: center;
-    padding: 26px;
+    padding: 26px 24px 24px;
     display: flex;
     flex-direction: column;
-    transition: border-color 0.2s;
   }
 
-  /* 배경 이미지 위에 얹는 그라디언트 오버레이
-     -> 어떤 사진을 올려도 격자/글자 가독성이 유지되도록 함 */
+  /* 배경 이미지 위의 밝은 막 : 어떤 사진이든 글자·칸이 잘 보이도록 */
   #calendar-capture::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(10,10,16,0.30) 0%, rgba(10,10,16,0.55) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0.86) 100%);
     z-index: 0;
+  }
+  /* 맨 위 포인트 띠 : 빨강 + 형광 초록을 섞지 않고 나란히 */
+  #calendar-capture::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 6px;
+    background: linear-gradient(90deg,
+      var(--main-color) 0%, var(--main-color) 64%,
+      var(--sub-color) 64%, var(--sub-color) 100%);
+    z-index: 2;
   }
 
   .cal-header {
@@ -403,32 +615,33 @@
   }
   .cal-header .title-block h2 {
     margin: 0;
-    font-size: 25px;
-    letter-spacing: -0.02em;
-    color: var(--text-main);
-    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--ink);
   }
   .cal-header .title-block p {
-    margin: 3px 0 0;
-    font-size: 13.5px;
-    color: var(--sub-color);
-    font-weight: 600;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    display: inline-block;
+    margin: 6px 0 0;
+    padding: 4px 12px;
+    border-radius: 50px;
+    background: rgba(var(--main-rgb), 0.08);
+    border: 1px solid rgba(var(--main-rgb), 0.30);
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--main-color);
   }
-  .cal-nav {
-    display: flex;
-    gap: 6px;
-  }
+  .cal-nav { display: flex; gap: 6px; }
   .cal-nav button {
-    width: 30px; height: 30px;
+    width: 34px; height: 34px;
     border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.25);
-    background: rgba(0,0,0,0.25);
-    color: #fff;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
     cursor: pointer;
-    font-size: 13px;
+    font-size: 15px;
     display: flex; align-items: center; justify-content: center;
-    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(60, 30, 50, 0.08);
   }
   .cal-nav button:hover { border-color: var(--main-color); color: var(--main-color); }
 
@@ -437,17 +650,20 @@
     z-index: 1;
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    margin-bottom: 8px;
+    gap: 6px;
+    margin-bottom: 6px;
   }
   .weekday-row span {
     text-align: center;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 700;
-    color: rgba(255,255,255,0.65);
-    text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+    color: var(--text-dim);
+    padding: 6px 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.78);
   }
-  .weekday-row span.sun { color: #ff8f9c; }
-  .weekday-row span.sat { color: #8fc4ff; }
+  .weekday-row span.sun { color: var(--sun); }
+  .weekday-row span.sat { color: var(--sat); }
 
   .day-grid {
     position: relative;
@@ -456,55 +672,63 @@
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     grid-auto-rows: 1fr;
-    gap: 5px;
+    gap: 6px;
   }
 
   .day-cell {
     position: relative;
-    border-radius: 9px;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(3px);
-    padding: 5px 5px 4px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.93);
+    border: 1px solid #efe6ee;
+    padding: 6px 6px 5px;
     display: flex;
     flex-direction: column;
     gap: 3px;
     overflow: hidden;
     transition: border-color 0.15s, background 0.15s;
   }
+  .day-cell.other-month { opacity: 0.42; background: rgba(248, 244, 248, 0.85); }
 
-  .day-cell.other-month { opacity: 0.28; }
-
-  /* "오늘" 날짜 -> 메인 컬러로 강조 */
+  /* 오늘 : 빨강 테두리 + 연한 빨강 바탕 + "오늘" 라벨 */
   .day-cell.today {
     border: 1.5px solid var(--main-color);
-    box-shadow: 0 0 10px -1px var(--main-color);
+    background:
+      linear-gradient(rgba(var(--main-rgb), 0.08), rgba(var(--main-rgb), 0.08)),
+      #ffffff;
+  }
+  .day-cell.today::after {
+    content: "오늘";
+    position: absolute;
+    top: 5px; right: 6px;
+    padding: 1px 6px;
+    border-radius: 50px;
+    background: var(--main-color);
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 700;
   }
 
-  /* 관리자 모드에서 "일정 추가" 대상으로 클릭해서 고른 날짜 -> 서브 컬러로 강조 */
+  /* 관리자 모드에서 고른 날짜 : 형광 초록 테두리 */
   .day-cell.selected {
     border: 1.5px solid var(--sub-color);
-    box-shadow: 0 0 10px -1px var(--sub-color);
+    box-shadow: 0 0 0 3px rgba(var(--sub-rgb), 0.38);
   }
-
-  /* 관리자 모드일 때만 JS가 이 클래스를 달아서 클릭 가능함을 알려준다 */
   .day-cell.clickable { cursor: pointer; }
-  .day-cell.clickable:hover { background: rgba(255,255,255,0.13); }
+  .day-cell.clickable:hover { background: #fff5f8; }
 
   .day-num {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 700;
-    color: var(--text-main);
-    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    color: var(--ink);
   }
   .day-cell.today .day-num { color: var(--main-color); }
-  .day-cell.sun .day-num { color: #ff9aa6; }
-  .day-cell.sat .day-num { color: #9ac9ff; }
+  .day-cell.sun .day-num { color: var(--sun); }
+  .day-cell.sat .day-num { color: var(--sat); }
 
   .tag-list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     overflow: hidden;
   }
   .tag {
@@ -514,18 +738,13 @@
     gap: 4px;
     font-size: 10.5px;
     font-weight: 700;
-    color: #14141f;
-    padding: 3px 7px;
-    border-radius: 20px;
+    padding: 3px 8px;
+    border-radius: 50px;
     line-height: 1.4;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* 태그 배경/글자색은 카테고리마다 다르므로 JS에서 인라인 스타일로 지정한다
-     (배경색 대비를 계산해 글자색을 자동으로 흰색/검은색 중 고른다) */
-
-  /* 태그 삭제(✕) 버튼 : 관리자 모드일 때만 JS가 붙여준다 */
   .tag .tag-delete {
     flex-shrink: 0;
     cursor: pointer;
@@ -536,44 +755,47 @@
   }
   .tag .tag-delete:hover { opacity: 1; }
 
-  /* ---------- 다운로드 버튼 ---------- */
+  /* ---------- 다운로드 버튼 : 카드 제목("방송 일정표") 바로 옆에 붙는 작은 알약.
+       진한 빨강 + 아래쪽 형광 초록 띠 ---------- */
   .download-btn {
-    width: min(1240px, 97%);
-    padding: 15px;
+    flex-shrink: 0;
+    padding: 8px 16px;
     border: none;
-    border-radius: var(--radius-md);
-    background: linear-gradient(135deg, var(--main-color), var(--sub-color));
-    color: #14141f;
-    font-size: 14.5px;
-    font-weight: 800;
+    border-radius: 50px;
+    background: var(--main-color);
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    box-shadow: 0 12px 30px -10px var(--main-color);
-    transition: transform 0.12s, opacity 0.12s;
+    gap: 6px;
+    box-shadow: inset 0 -3px 0 var(--sub-color), 0 8px 16px -10px rgba(var(--main-rgb), 0.6);
+    transition: transform 0.12s, filter 0.12s;
   }
-  .download-btn:hover { transform: translateY(-2px); }
+  .download-btn:hover { transform: translateY(-2px); filter: brightness(1.06); }
   .download-btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
 
-  /* ---------- 구글 시트 동기화 표시줄 (누구에게나 보임) ---------- */
+  /* ---------- 동기화 표시줄 ---------- */
   .sync-row {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--text-dim);
   }
   .sync-row #manualSyncBtn {
-    width: 22px; height: 22px;
+    width: 26px; height: 26px;
     border-radius: 50%;
     border: 1px solid var(--line);
-    background: rgba(255,255,255,0.05);
+    background: #fff;
     color: var(--text-dim);
     cursor: pointer;
-    font-size: 12px;
+    font-size: 13px;
     display: flex; align-items: center; justify-content: center;
     transition: transform 0.4s, border-color 0.15s;
   }
@@ -581,285 +803,349 @@
   .sync-row #manualSyncBtn.spinning { animation: spin 0.8s linear infinite; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-  /* ---------- 토스트 알림 (alert 대체) ---------- */
+  /* ---------- 토스트 알림 ---------- */
   #toast {
     position: fixed;
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%) translateY(20px);
-    background: #1c1c2a;
-    border: 1px solid var(--main-color);
-    color: var(--text-main);
+    background: #fff;
+    border: 1px solid rgba(var(--main-rgb), 0.35);
+    color: var(--ink);
     padding: 12px 20px;
-    border-radius: 30px;
+    border-radius: 50px;
     font-size: 13px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(60, 30, 50, 0.2);
     opacity: 0;
     pointer-events: none;
     transition: 0.25s;
     z-index: 999;
   }
-  #toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- 푸터 ---------- */
+  .site-footer {
+    margin-top: 28px;
+    padding: 22px 6px 0;
+    border-top: 1px solid var(--line);
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .site-footer strong { color: var(--main-color); font-size: 14px; }
+
+  /* 캘린더 카드 제목 줄 : [방송 일정표] [PNG 다운로드] ........ [안내 문구] */
+  .calendar-stage .card-head { justify-content: flex-start; gap: 14px; margin-bottom: 4px; }
+
+  /* ---------- 넓은 화면에서는 캘린더 안의 글자·칸도 같이 키운다 ---------- */
+  @media (min-width: 1200px) {
+    #calendar-capture { padding: 30px 28px 28px; }
+    .cal-header .title-block h2 { font-size: 36px; }
+    .cal-header .title-block p { font-size: 14px; padding: 5px 14px; }
+    .cal-nav button { width: 40px; height: 40px; font-size: 17px; }
+    .weekday-row, .day-grid { gap: 8px; }
+    .weekday-row span { font-size: 14.5px; padding: 8px 0; }
+    .day-cell { padding: 8px 8px 6px; border-radius: 14px; gap: 4px; }
+    .day-num { font-size: 16.5px; }
+    .day-cell.today::after { font-size: 11px; padding: 2px 8px; top: 7px; right: 8px; }
+    .tag { font-size: 12.5px; padding: 4px 10px; }
+    .tag .tag-delete { font-size: 11.5px; }
   }
 
-  /* ---------- 반응형 : 좁은 화면에서는 위/아래로 쌓기 ---------- */
-  @media (max-width: 980px) {
-    .app { flex-direction: column; }
-    .control-panel {
-      width: 100%;
-      max-height: none;
-      border-right: none;
-      border-bottom: 1px solid var(--line);
-    }
+  /* ---------- 반응형 ---------- */
+  @media (max-width: 1080px) {
+    body.is-admin .layout { grid-template-columns: minmax(0, 1fr); }
+    .control-panel { position: static; max-height: none; overflow: visible; }
+  }
+  @media (max-width: 760px) {
+    .header-pill { display: none; }
+  }
+  @media (max-width: 640px) {
+    .site-header { top: 8px; padding: 10px 12px; }
+    .header-left { gap: 10px; }
+    .brand { gap: 9px; }
+    .brand .avatar { width: 34px; height: 34px; font-size: 14px; }
+    .brand h1 { font-size: 17px; }
+    .brand small { font-size: 10.5px; }
+    .admin-pill { padding: 6px 10px; font-size: 11.5px; }
+    /* 좁은 화면에서는 팝오버를 알약 기준이 아니라 헤더 폭 기준으로 펼친다
+       (알약 기준이면 오른쪽 화면 밖으로 삐져나가 가로 스크롤이 생긴다) */
+    .admin-wrap { position: static; }
+    .admin-popover { left: 12px; right: 12px; width: auto; }
+    .hero { padding: 12px 16px; }
+    /* 좁은 화면에서는 말풍선이 글자를 가리지 않게 제목 아래로 내린다 */
+    .hero .hero-tag { position: static; transform: none; display: inline-block; max-width: 100%; margin-top: 8px; }
+    .download-btn { padding: 7px 12px; font-size: 12px; }
+    .card { padding: 16px; }
+    #calendar-capture { aspect-ratio: auto; min-height: 520px; padding: 18px 10px 12px; }
+    .cal-header .title-block h2 { font-size: 22px; }
+    .day-grid, .weekday-row { gap: 3px; }
+    .day-cell { padding: 4px 3px; border-radius: 8px; }
+    .day-cell.today::after { display: none; }
+    .tag { font-size: 9px; padding: 2px 5px; }
+    input.cal-title-input { display: none; }
   }
 </style>
 </head>
 <body>
 
-  <div class="app">
+  <div class="site">
 
-    <!-- =========================================================
-         좌측 : 스트리머 테마 커스텀 제어판
-         ========================================================= -->
-    <aside class="control-panel">
-      <div class="brand">
-        <span class="dot"></span>
-        <h1>STREAMER CALENDAR MAKER</h1>
-      </div>
-      <span>나만의 방송 일정표를 만들어 팬들과 공유해보세요 ✨</span>
-
-      <!-- 관리자 로그인 : 뷰어(일반 방문자)에게도 항상 보이는 유일한 컨트롤.
-           비밀번호를 맞춰야만 아래 편집 패널(adminPanel)이 열린다.
-           ※ 정적 페이지라 진짜 보안이 아니라 "가벼운 잠금"이라는 점에 유의 -->
-      <section class="section" id="adminLoginSection">
-        <div class="section-title"><span class="num">🔒</span> 관리자 모드</div>
-
-        <div id="adminLockedView">
-          <p class="sheet-help">
-            카테고리를 편집하거나 시트 연동 상태를 관리하려면 관리자 비밀번호를 입력하세요.
-            일반 방문자는 완성된 캘린더 보기와 PNG 저장만 가능해요.
-          </p>
-          <div class="field">
-            <input type="password" id="adminPasswordInput" placeholder="관리자 비밀번호" />
-          </div>
-          <button type="button" class="add-btn" id="adminLoginBtn">🔓 잠금 해제</button>
-          <div class="sheet-status error" id="adminLoginError" style="display:none;">
-            비밀번호가 올바르지 않아요
+    <!-- 상단 헤더 : 제목 바로 옆에 "관리자 접속 여부" 알약이 붙는다.
+         누르면 아래로 로그인(잠김) / 로그아웃(관리자) 팝오버가 펼쳐진다. -->
+    <header class="site-header">
+      <div class="header-left">
+        <div class="brand">
+          <span class="avatar">설</span>
+          <div>
+            <h1>SEOLHONG</h1>
+            <small>설홍의 방송 일정표</small>
           </div>
         </div>
 
-        <div id="adminUnlockedView" style="display:none;">
-          <p class="sheet-help">
-            ✅ 관리자 모드예요. 편집 내용은 이 브라우저에만 자동 저장되고,
-            다른 방문자에게 보이게 하려면 아래 "설정 내보내기"로 배포를 요청하세요.
-          </p>
-          <button type="button" class="add-btn" id="adminLogoutBtn">🔒 관리자 모드 종료</button>
-        </div>
-      </section>
+        <div class="admin-wrap">
+          <button type="button" class="admin-pill" id="adminStatusBtn" aria-haspopup="true" aria-expanded="false" title="관리자 접속">
+            <span class="state-dot"></span>
+            <span class="when-locked">관리자 로그인</span>
+            <span class="when-admin">관리자 모드 ON</span>
+          </button>
 
-      <!-- 편집 패널 전체. 관리자 로그인 전에는 완전히 숨겨져 있다 -->
-      <div id="adminPanel" style="display:none;">
+          <div class="admin-popover" id="adminPopover">
+            <!-- 관리자 로그인 : 비밀번호를 맞춰야만 오른쪽 관리자 카드(편집 패널)가 열린다.
+                 ※ 정적 페이지라 진짜 보안이 아니라 "가벼운 잠금"이라는 점에 유의 -->
+            <div id="adminLockedView">
+              <p class="sheet-help">
+                관리자 비밀번호를 입력하면 일정·카테고리·시트 연동을 편집할 수 있어요.
+                일반 방문자는 완성된 캘린더 보기와 PNG 저장만 가능해요.
+              </p>
+              <div class="field">
+                <input type="password" id="adminPasswordInput" placeholder="관리자 비밀번호" />
+              </div>
+              <button type="button" class="add-btn" id="adminLoginBtn">잠금 해제</button>
+              <div class="sheet-status error" id="adminLoginError" style="display:none;">
+                비밀번호가 올바르지 않아요
+              </div>
+            </div>
 
-      <!-- 0. 연결된 구글 시트 변경 : 설정/일정을 읽어오는 스프레드시트 자체를
-           다른 시트로 바꾼다. 이 값은 (localStorage가 아니라) 고정된
-           마스터 시트(MASTER_SHEET)의 F~I열에 저장되므로, 관리자 비밀번호로
-           한 번 전환하면 코드 수정이나 재배포 없이 모든 방문자에게 즉시
-           반영된다. 관리자 비밀번호 자체는 항상 MASTER_SHEET의 E열에서만
-           확인하므로, 대상 시트를 바꿔도 로그인 비밀번호는 그대로 유지된다. -->
-      <section class="section">
-        <div class="section-title">
-          <span class="num">🔗</span> 연결된 구글 시트
-          <button type="button" class="section-toggle-btn" id="toggleSheetConfigBtn" title="보이기">▶</button>
-        </div>
-
-        <!-- 실수로 URL/ID가 눈에 띄지 않도록 기본은 숨김 상태.
-             관리자 모드로 들어와도 이 버튼을 직접 눌러야만 펼쳐진다. -->
-        <div id="sheetConfigBody" style="display:none;">
-          <p class="sheet-help">
-            이 캘린더가 읽고 쓰는 구글 시트를 다른 시트로 바꿀 수 있어요.
-            바꾸기 전에 새 시트가 <b>"링크가 있는 모든 사용자 - 뷰어"</b>로
-            공유되어 있고, 기존 시트와 <b>같은 탭 구성·열 구성</b>을 갖췄는지
-            확인해주세요. gid는 해당 탭을 클릭했을 때 주소창의
-            <code>#gid=숫자</code> 부분에서 확인할 수 있어요.
-          </p>
-          <p class="sheet-help">
-            ✅ 여기서 전환하면 <b>모든 방문자에게 바로 반영</b>돼요 (재배포 필요 없음).
-            비워두고 저장하면 원래 기본 시트로 돌아갑니다.
-          </p>
-
-          <div class="field">
-            <label for="sheetConfigSpreadsheetInput">구글 시트 URL 또는 ID</label>
-            <input type="text" id="sheetConfigSpreadsheetInput" placeholder="https://docs.google.com/spreadsheets/d/xxxx/edit" />
-          </div>
-          <div class="field">
-            <label for="sheetConfigSettingsGidInput">설정/비밀번호 탭 gid</label>
-            <input type="text" id="sheetConfigSettingsGidInput" placeholder="예: 1577649692" />
-          </div>
-          <div class="field">
-            <label for="sheetConfigScheduleGidInput">일정 탭 gid</label>
-            <input type="text" id="sheetConfigScheduleGidInput" placeholder="예: 1998787329" />
-          </div>
-          <div class="field">
-            <label for="sheetConfigAppsScriptInput">Apps Script 웹앱 URL</label>
-            <input type="text" id="sheetConfigAppsScriptInput" placeholder="https://script.google.com/macros/s/xxx/exec" />
-          </div>
-
-          <button type="button" class="add-btn" id="switchSheetBtn">🔀 이 시트로 전환</button>
-          <button type="button" class="add-btn" id="resetSheetBtn" style="margin-top:8px;">↩️ 기본 시트로 되돌리기</button>
-          <div class="sheet-status" id="sheetConfigStatus"></div>
-        </div>
-      </section>
-
-      <!-- 1. 설정 데이터 : 테마 컬러 / 배경 이미지 / 캘린더 제목은 구글 시트가
-           정답이고, 모든 방문자에게 거기서 자동으로 반영된다. 아래 컬러
-           피커/입력창은 어디까지나 "미리보기 + 시트에 저장" 도구다 —
-           저장 버튼을 눌러야만 실제로 시트에 반영되고, 그래야 다른
-           방문자에게도 보인다. -->
-      <section class="section">
-        <div class="section-title"><span class="num">1</span> 설정 데이터</div>
-        <p class="sheet-help">
-          테마 컬러 · 배경 이미지 · 캘린더 제목은 연결된 구글 시트가 정답이고,
-          <b>모든 방문자에게 자동으로</b> 반영돼요. 아래에서 미리 보면서 값을
-          바꾼 뒤 "시트에 저장"을 눌러야 실제로 반영됩니다 (시트 셀을 직접
-          편집해도 동일하게 동작해요).
-        </p>
-
-        <div class="color-row">
-          <div class="color-field">
-            <label for="previewMainColor">메인 컬러 (미리보기)</label>
-            <input type="color" id="previewMainColor" value="#b98cf9" />
-          </div>
-          <div class="color-field">
-            <label for="previewSubColor">서브 컬러 (미리보기)</label>
-            <input type="color" id="previewSubColor" value="#ff8fc7" />
+            <div id="adminUnlockedView" style="display:none;">
+              <p class="sheet-help">
+                ✅ 관리자 모드예요. 카테고리 편집 내용은 이 브라우저에만 저장되고,
+                다른 방문자에게 보이게 하려면 관리자 카드의 "설정 복사하기"로 배포를 요청하세요.
+              </p>
+              <button type="button" class="add-btn" id="adminLogoutBtn">관리자 모드 종료</button>
+            </div>
           </div>
         </div>
-
-        <div class="field">
-          <label for="previewCalTitle">캘린더 제목</label>
-          <input type="text" id="previewCalTitle" placeholder="예: 설홍의 9월 방송표" maxlength="30" />
-        </div>
-
-        <div class="field">
-          <label for="previewBgImageUrl">배경 이미지 URL (Imgur 등 직접 링크)</label>
-          <input type="text" id="previewBgImageUrl" placeholder="https://i.imgur.com/xxxxx.png" />
-        </div>
-
-        <button type="button" class="add-btn" id="saveSettingsToSheetBtn">💾 이 값들을 시트에 저장</button>
-        <button type="button" class="add-btn" id="manualSettingsSyncBtn">🔄 시트에서 다시 불러오기</button>
-        <div class="sheet-status" id="settingsWriteStatus"></div>
-      </section>
-
-      <!-- 2. 카테고리 관리 -->
-      <section class="section">
-        <div class="section-title"><span class="num">2</span> 카테고리 관리</div>
-
-        <!-- 현재 카테고리 목록. JS의 renderCategories()가 매번 새로 그린다 -->
-        <div class="category-list" id="categoryList"></div>
-
-        <div class="add-category-row">
-          <input type="color" id="newCategoryColor" value="#8fd3ff" title="카테고리 색상" />
-          <input type="text" id="newCategoryLabel" placeholder="새 카테고리 이름 (예: 콜라보)" maxlength="10" />
-          <button type="button" class="icon-btn" id="addCategoryBtn" title="카테고리 추가">+</button>
-        </div>
-      </section>
-
-      <!-- 5. 일정 데이터 : 이제 구글 시트가 유일한 데이터 소스.
-           방문자가 페이지를 열 때마다(관리자든 아니든) 자동으로 이 시트를
-           읽어와서 캘린더에 반영하므로, 일정을 바꾸고 싶으면 시트만 고치면
-           되고 배포/Claude 요청이 필요 없다. -->
-      <section class="section">
-        <div class="section-title"><span class="num">3</span> 일정 데이터</div>
-        <p class="sheet-help">
-          일정은 연결된 구글 시트에서 <b>모든 방문자에게 자동으로</b> 반영돼요.
-          추가·수정·삭제는 이 페이지가 아니라 <b>시트를 직접 편집</b>해서 하면 됩니다.
-        </p>
-        <p class="sheet-help">
-          열 구성: <b>A=날짜(YYYY-MM-DD) · B=카테고리 · C=내용</b>, 1행은 헤더로 비워두세요.
-          카테고리 칸에는 왼쪽 "카테고리 관리"에 있는 이름을 그대로 적으면 자동 매칭됩니다.
-        </p>
-
-        <!-- 시트를 직접 열지 않고도 이 폼으로 바로 행을 추가할 수 있다.
-             (내부적으로는 결국 시트에 새 행을 쓰는 것과 동일하다)
-             오른쪽 캘린더에서 날짜 칸을 클릭하면 아래 날짜가 자동으로 채워진다. -->
-        <div class="field">
-          <label for="newScheduleDate">📅 날짜</label>
-          <input type="date" id="newScheduleDate" class="date-picker" />
-          <p class="date-picker-hint">오른쪽 캘린더에서 날짜를 클릭하면 자동으로 채워져요 ✨</p>
-        </div>
-        <div class="field">
-          <label for="newScheduleCategory">카테고리</label>
-          <select id="newScheduleCategory"></select>
-        </div>
-        <div class="field">
-          <label for="newScheduleText">내용</label>
-          <input type="text" id="newScheduleText" placeholder="예: 21시 발로란트 저챗" maxlength="18" />
-        </div>
-        <button type="button" class="add-btn" id="addScheduleToSheetBtn">📤 시트에 일정 추가</button>
-        <div class="sheet-status" id="scheduleWriteStatus"></div>
-
-        <button type="button" class="add-btn" id="manualSyncBtnAdmin" style="margin-top:14px;">🔄 지금 다시 불러오기</button>
-      </section>
-
-      <!-- 4. 배포용 설정 내보내기 (카테고리 목록에만 해당.
-           컬러/배경/제목/일정은 이제 전부 구글 시트가 대신하므로 여기서 다루지 않는다) -->
-      <section class="section">
-        <div class="section-title"><span class="num">4</span> 다른 사람에게도 보이게 하기</div>
-        <p class="sheet-help">
-          카테고리 목록만 이 브라우저에 저장돼요 (컬러·배경·제목·일정은
-          이미 구글 시트가 모두에게 자동으로 보여줍니다).
-          카테고리 변경도 다른 방문자에게 반영하려면, 아래 버튼으로 복사해서
-          매실이한테 "배포해줘"라고 요청해주세요.
-        </p>
-        <button type="button" class="add-btn" id="exportConfigBtn">📤 설정 복사하기 (배포 요청용)</button>
-      </section>
-
-      </div><!-- /#adminPanel -->
-    </aside>
-
-    <!-- =========================================================
-         우측 : 실제 출력되는 월간 캘린더
-         ========================================================= -->
-    <main class="calendar-stage">
-
-      <div class="title-input-wrap">
-        <input type="text" class="cal-title-input" id="hintInput" value="↓ 아래가 실제로 저장될 캘린더 미리보기입니다" readonly />
       </div>
 
-      <!-- html2canvas가 캡처할 대상은 오직 이 div 뿐이다 -->
-      <div id="calendar-capture">
-        <div class="cal-header">
-          <div class="title-block">
-            <h2 id="calMonthTitle">2026년 8월</h2>
-            <p id="calSubTitle">MY STREAMING CALENDAR</p>
-          </div>
-          <div class="cal-nav">
-            <button type="button" id="prevMonthBtn">‹</button>
-            <button type="button" id="nextMonthBtn">›</button>
-          </div>
+      <span class="header-pill"><span class="dot"></span>MONTHLY SCHEDULE</span>
+    </header>
+
+    <!-- 히어로 -->
+    <section class="hero">
+      <p class="eyebrow">STREAMING CALENDAR</p>
+      <h2>이번 달 방송 일정</h2>
+      <p>설홍의 방송 일정을 한눈에 확인하고, PNG로 저장해 공유해보세요.</p>
+      <span class="hero-tag" id="heroTag">♡ 오늘도 함께해요</span>
+    </section>
+
+    <div class="layout">
+
+      <!-- =========================================================
+           캘린더 카드
+           ========================================================= -->
+      <main class="card calendar-stage">
+        <div class="card-head">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            방송 일정표
+          </h3>
+          <button type="button" class="download-btn" id="downloadBtn">📥 PNG로 다운로드</button>
+          <input type="text" class="cal-title-input" id="hintInput" value="아래 캘린더가 그대로 PNG로 저장돼요" readonly />
         </div>
 
-        <div class="weekday-row">
-          <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
+        <!-- html2canvas가 캡처할 대상은 오직 이 div 뿐이다 -->
+        <div id="calendar-capture">
+          <div class="cal-header">
+            <div class="title-block">
+              <h2 id="calMonthTitle">2026년 8월</h2>
+              <p id="calSubTitle">MY STREAMING CALENDAR</p>
+            </div>
+            <div class="cal-nav">
+              <button type="button" id="prevMonthBtn">‹</button>
+              <button type="button" id="nextMonthBtn">›</button>
+            </div>
+          </div>
+
+          <div class="weekday-row">
+            <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
+          </div>
+
+          <div class="day-grid" id="dayGrid"></div>
         </div>
 
-        <!-- 날짜 칸들이 JS에 의해 이 안에 그려진다 -->
-        <div class="day-grid" id="dayGrid"></div>
-      </div>
+        <div class="sync-row">
+          <span id="publicSyncIndicator">🔄 동기화 대기 중...</span>
+          <button type="button" id="manualSyncBtn" title="구글 시트에서 다시 불러오기">↻</button>
+        </div>
+      </main>
 
-      <button type="button" class="download-btn" id="downloadBtn">📥 PNG로 다운로드</button>
+      <!-- =========================================================
+           관리자 카드 (관리자로 접속했을 때만 보인다)
+           ========================================================= -->
+      <aside class="card control-panel">
+        <div class="card-head">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            관리자 패널
+          </h3>
+        </div>
 
-      <!-- 구글 시트 동기화 상태 : 관리자 여부와 상관없이 누구에게나 보이는
-           읽기 전용 표시. 새로고침 버튼도 데이터를 바꾸는 게 아니라 다시
-           읽어오기만 하므로 방문자도 눌러도 안전하다. -->
-      <div class="sync-row">
-        <span id="publicSyncIndicator">🔄 동기화 대기 중...</span>
-        <button type="button" id="manualSyncBtn" title="구글 시트에서 다시 불러오기">↻</button>
-      </div>
+        <div id="adminPanel" style="display:none;">
 
-    </main>
+        <section class="section">
+          <div class="section-title">
+            <span class="num">🔗</span> 연결된 구글 시트
+            <button type="button" class="section-toggle-btn" id="toggleSheetConfigBtn" title="보이기">▶</button>
+          </div>
+
+          <div id="sheetConfigBody" style="display:none;">
+            <p class="sheet-help">
+              이 캘린더가 읽고 쓰는 구글 시트를 다른 시트로 바꿀 수 있어요.
+              바꾸기 전에 새 시트가 <b>"링크가 있는 모든 사용자 - 뷰어"</b>로
+              공유되어 있고, 기존 시트와 <b>같은 탭 구성·열 구성</b>을 갖췄는지
+              확인해주세요. gid는 해당 탭을 클릭했을 때 주소창의
+              <code>#gid=숫자</code> 부분에서 확인할 수 있어요.
+            </p>
+            <p class="sheet-help">
+              ✅ 여기서 전환하면 <b>모든 방문자에게 바로 반영</b>돼요 (재배포 필요 없음).
+              비워두고 저장하면 원래 기본 시트로 돌아갑니다.
+            </p>
+
+            <div class="field">
+              <label for="sheetConfigSpreadsheetInput">구글 시트 URL 또는 ID</label>
+              <input type="text" id="sheetConfigSpreadsheetInput" placeholder="https://docs.google.com/spreadsheets/d/xxxx/edit" />
+            </div>
+            <div class="field">
+              <label for="sheetConfigSettingsGidInput">설정/비밀번호 탭 gid</label>
+              <input type="text" id="sheetConfigSettingsGidInput" placeholder="예: 1577649692" />
+            </div>
+            <div class="field">
+              <label for="sheetConfigScheduleGidInput">일정 탭 gid</label>
+              <input type="text" id="sheetConfigScheduleGidInput" placeholder="예: 1998787329" />
+            </div>
+            <div class="field">
+              <label for="sheetConfigAppsScriptInput">Apps Script 웹앱 URL</label>
+              <input type="text" id="sheetConfigAppsScriptInput" placeholder="https://script.google.com/macros/s/xxx/exec" />
+            </div>
+
+            <button type="button" class="add-btn" id="switchSheetBtn">이 시트로 전환</button>
+            <button type="button" class="add-btn" id="resetSheetBtn">기본 시트로 되돌리기</button>
+            <div class="sheet-status" id="sheetConfigStatus"></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title"><span class="num">1</span> 설정 데이터</div>
+          <p class="sheet-help">
+            테마 컬러 · 배경 이미지 · 캘린더 제목은 연결된 구글 시트가 정답이고,
+            <b>모든 방문자에게 자동으로</b> 반영돼요. 아래에서 미리 보면서 값을
+            바꾼 뒤 "시트에 저장"을 눌러야 실제로 반영됩니다 (시트 셀을 직접
+            편집해도 동일하게 동작해요).
+          </p>
+
+          <div class="color-row">
+            <div class="color-field">
+              <label for="previewMainColor">메인 컬러</label>
+              <input type="color" id="previewMainColor" value="#db2452" />
+            </div>
+            <div class="color-field">
+              <label for="previewSubColor">서브 컬러</label>
+              <input type="color" id="previewSubColor" value="#7af07c" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="previewCalTitle">캘린더 제목</label>
+            <input type="text" id="previewCalTitle" placeholder="예: 설홍의 9월 방송표" maxlength="30" />
+          </div>
+
+          <div class="field">
+            <label for="previewHeroTag">상단 띠 말풍선 문구 (비우면 기본 문구)</label>
+            <input type="text" id="previewHeroTag" placeholder="♡ 오늘도 함께해요" maxlength="24" />
+          </div>
+
+          <div class="field">
+            <label for="previewBgImageUrl">배경 이미지 URL (Imgur 등 직접 링크)</label>
+            <input type="text" id="previewBgImageUrl" placeholder="https://i.imgur.com/xxxxx.png" />
+          </div>
+
+          <button type="button" class="add-btn" id="saveSettingsToSheetBtn">이 값들을 시트에 저장</button>
+          <button type="button" class="add-btn" id="manualSettingsSyncBtn">시트에서 다시 불러오기</button>
+          <div class="sheet-status" id="settingsWriteStatus"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title"><span class="num">2</span> 카테고리 관리</div>
+          <div class="category-list" id="categoryList"></div>
+          <div class="add-category-row">
+            <input type="color" id="newCategoryColor" value="#8fd3ff" title="카테고리 색상" />
+            <input type="text" id="newCategoryLabel" placeholder="새 카테고리 이름 (예: 콜라보)" maxlength="10" />
+            <button type="button" class="icon-btn" id="addCategoryBtn" title="카테고리 추가">+</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title"><span class="num">3</span> 일정 데이터</div>
+          <p class="sheet-help">
+            일정은 연결된 구글 시트에서 <b>모든 방문자에게 자동으로</b> 반영돼요.
+            추가·수정·삭제는 이 페이지가 아니라 <b>시트를 직접 편집</b>해서 하면 됩니다.
+          </p>
+          <p class="sheet-help">
+            열 구성: <b>A=날짜(YYYY-MM-DD) · B=카테고리 · C=내용</b>, 1행은 헤더로 비워두세요.
+            카테고리 칸에는 "카테고리 관리"에 있는 이름을 그대로 적으면 자동 매칭됩니다.
+          </p>
+
+          <div class="field">
+            <label for="newScheduleDate">날짜</label>
+            <input type="date" id="newScheduleDate" class="date-picker" />
+            <p class="date-picker-hint">캘린더에서 날짜를 클릭하면 자동으로 채워져요</p>
+          </div>
+          <div class="field">
+            <label for="newScheduleCategory">카테고리</label>
+            <select id="newScheduleCategory"></select>
+          </div>
+          <div class="field">
+            <label for="newScheduleText">내용</label>
+            <input type="text" id="newScheduleText" placeholder="예: 21시 발로란트 저챗" maxlength="18" />
+          </div>
+          <button type="button" class="add-btn" id="addScheduleToSheetBtn">시트에 일정 추가</button>
+          <div class="sheet-status" id="scheduleWriteStatus"></div>
+
+          <button type="button" class="add-btn" id="manualSyncBtnAdmin">지금 다시 불러오기</button>
+        </section>
+
+        <section class="section">
+          <div class="section-title"><span class="num">4</span> 다른 사람에게도 보이게 하기</div>
+          <p class="sheet-help">
+            카테고리 목록만 이 브라우저에 저장돼요 (컬러·배경·제목·일정은
+            이미 구글 시트가 모두에게 자동으로 보여줍니다).
+            카테고리 변경도 다른 방문자에게 반영하려면, 아래 버튼으로 복사해서
+            매실이한테 "배포해줘"라고 요청해주세요.
+          </p>
+          <button type="button" class="add-btn" id="exportConfigBtn">설정 복사하기 (배포 요청용)</button>
+        </section>
+
+        </div><!-- /#adminPanel -->
+      </aside>
+
+    </div><!-- /.layout -->
+
+    <footer class="site-footer">
+      <strong>SEOLHONG</strong><br />
+      설홍과 함께 쌓아가는 방송 기록
+    </footer>
   </div>
 
   <div id="toast"></div>
@@ -1099,7 +1385,43 @@ function applyAdminModeUI(isAdmin) {
   adminPanel.style.display = isAdmin ? 'block' : 'none';
   adminLockedView.style.display = isAdmin ? 'none' : 'block';
   adminUnlockedView.style.display = isAdmin ? 'block' : 'none';
+  // 헤더의 "관리자 접속 여부" 알약과 오른쪽 관리자 카드는 이 클래스 하나로 CSS가 전환한다
+  document.body.classList.toggle('is-admin', isAdmin);
+  closeAdminPopover();
 }
+
+/* 헤더의 "관리자 로그인 / 관리자 모드 ON" 알약을 누르면 로그인(잠김) 또는
+   로그아웃(관리자) 팝오버가 열린다. 바깥을 누르거나 Esc를 누르면 닫힌다. */
+function closeAdminPopover() {
+  const pop = document.getElementById('adminPopover');
+  const btn = document.getElementById('adminStatusBtn');
+  if (pop) pop.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleAdminPopover() {
+  const pop = document.getElementById('adminPopover');
+  const btn = document.getElementById('adminStatusBtn');
+  if (!pop || !btn) return;
+  const willOpen = !pop.classList.contains('open');
+  pop.classList.toggle('open', willOpen);
+  btn.setAttribute('aria-expanded', String(willOpen));
+  if (willOpen && !document.body.classList.contains('is-admin')) {
+    adminLoginError.style.display = 'none';
+    adminPasswordInput.focus();
+  }
+}
+
+document.getElementById('adminStatusBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleAdminPopover();
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.admin-wrap')) closeAdminPopover();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeAdminPopover();
+});
 
 function showAdminLoginError(message) {
   adminLoginError.textContent = message;
@@ -1334,9 +1656,27 @@ function loadState() {
 const calendarCapture = document.getElementById('calendar-capture');
 const calSubTitle = document.getElementById('calSubTitle');
 
+/* "#db2452" → "219, 36, 82". CSS에서 rgba(var(--main-rgb), .1) 처럼 쓰면
+   테마 색에 맞는 연한 배경·테두리가 자동으로 만들어진다. */
+function hexToRgbTriplet(hex) {
+  let c = (hex || '').trim().replace('#', '');
+  if (c.length === 3) c = c.split('').map((ch) => ch + ch).join('');
+  if (!/^[0-9a-fA-F]{6}$/.test(c)) return null;
+  return `${parseInt(c.slice(0, 2), 16)}, ${parseInt(c.slice(2, 4), 16)}, ${parseInt(c.slice(4, 6), 16)}`;
+}
+
 function applyThemeColors(mainColor, subColor) {
-  if (mainColor) document.documentElement.style.setProperty('--main-color', mainColor);
-  if (subColor) document.documentElement.style.setProperty('--sub-color', subColor);
+  const root = document.documentElement.style;
+  if (mainColor) {
+    root.setProperty('--main-color', mainColor);
+    const rgb = hexToRgbTriplet(mainColor);
+    if (rgb) root.setProperty('--main-rgb', rgb);
+  }
+  if (subColor) {
+    root.setProperty('--sub-color', subColor);
+    const rgb = hexToRgbTriplet(subColor);
+    if (rgb) root.setProperty('--sub-rgb', rgb);
+  }
 }
 
 /* ================================================================
@@ -1862,9 +2202,19 @@ const previewMainColor = document.getElementById('previewMainColor');
 const previewSubColor = document.getElementById('previewSubColor');
 const previewCalTitle = document.getElementById('previewCalTitle');
 const previewBgImageUrl = document.getElementById('previewBgImageUrl');
+const previewHeroTag = document.getElementById('previewHeroTag');
 const saveSettingsToSheetBtn = document.getElementById('saveSettingsToSheetBtn');
 const settingsWriteStatus = document.getElementById('settingsWriteStatus');
 const manualSettingsSyncBtn = document.getElementById('manualSettingsSyncBtn');
+
+/* 상단 띠 오른쪽 말풍선("♡ 오늘도 함께해요") 문구.
+   - 시트 설정 행의 J열(10번째 칸)에 저장되고, 비어있으면 아래 기본 문구를 쓴다.
+   - 관리자가 "설정 데이터"에서 바꾸고 시트에 저장하면 모든 방문자에게 반영된다. */
+const DEFAULT_HERO_TAG = '♡ 오늘도 함께해요';
+const heroTagEl = document.getElementById('heroTag');
+function applyHeroTag(text) {
+  if (heroTagEl) heroTagEl.textContent = (text || '').trim() || DEFAULT_HERO_TAG;
+}
 
 /* 구글 시트(SETTINGS_SHEET)를 읽어서 테마 컬러/배경 이미지/캘린더 제목을 채운다.
    - 데이터 행(2행)의 칸 구성: 메인컬러, 서브컬러, 캘린더제목, 배경이미지URL, (관리자비밀번호)
@@ -1909,15 +2259,18 @@ async function syncSettingsFromSheet() {
     const subColor = (dataRow[1] || '').trim();
     const calTitle = (dataRow[2] || '').trim();
     const bgImageUrl = (dataRow[3] || '').trim();
+    const heroTagText = (dataRow[9] || '').trim(); // J열
 
     applyThemeColors(mainColor, subColor);
     calSubTitle.textContent = calTitle || 'MY STREAMING CALENDAR';
     calendarCapture.style.backgroundImage = bgImageUrl ? `url(${bgImageUrl})` : 'none';
+    applyHeroTag(heroTagText);
 
     if (previewMainColor && mainColor) previewMainColor.value = mainColor;
     if (previewSubColor && subColor) previewSubColor.value = subColor;
     if (previewCalTitle) previewCalTitle.value = calTitle;
     if (previewBgImageUrl) previewBgImageUrl.value = bgImageUrl;
+    if (previewHeroTag) previewHeroTag.value = heroTagText;
   } catch (err) {
     // 설정 동기화 실패는 치명적이지 않다 — CSS 기본 컬러/빈 배경으로 그냥 보여준다.
     console.error('설정 동기화 실패:', err);
@@ -1939,6 +2292,7 @@ if (previewBgImageUrl) previewBgImageUrl.addEventListener('input', () => {
   const url = previewBgImageUrl.value.trim();
   calendarCapture.style.backgroundImage = url ? `url(${url})` : 'none';
 });
+if (previewHeroTag) previewHeroTag.addEventListener('input', () => applyHeroTag(previewHeroTag.value));
 
 if (saveSettingsToSheetBtn) {
   saveSettingsToSheetBtn.addEventListener('click', async () => {
@@ -1955,6 +2309,7 @@ if (saveSettingsToSheetBtn) {
       subColor: previewSubColor.value,
       calTitle: previewCalTitle.value,
       bgImageUrl: previewBgImageUrl.value.trim(),
+      heroTag: previewHeroTag.value.trim(),
     };
 
     try {
@@ -1968,7 +2323,8 @@ if (saveSettingsToSheetBtn) {
         previewMainColor.value === attempted.mainColor &&
         previewSubColor.value === attempted.subColor &&
         previewCalTitle.value === attempted.calTitle &&
-        previewBgImageUrl.value.trim() === attempted.bgImageUrl;
+        previewBgImageUrl.value.trim() === attempted.bgImageUrl &&
+        previewHeroTag.value.trim() === attempted.heroTag;
       if (!verified) throw new Error('WRITE_NOT_VERIFIED');
 
       settingsWriteStatus.classList.add('success');
