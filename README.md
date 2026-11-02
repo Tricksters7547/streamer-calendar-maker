@@ -18,7 +18,7 @@
 
 | # | 항목 | 어디에 있나 | 새 담당자에게 필요한 것 | 전달 방법 |
 |---|------|-------------|------------------------|-----------|
-| 1 | 소스 코드 | GitHub `streamer-calendar-maker` | 쓰기 권한 | Settings → Collaborators → 초대 |
+| 1 | 소스 코드 | GitHub `streamer-calendar-maker` (Public) | 가져가서 쓰기만 하면 **권한 불필요**. 원본에 push 하려면 쓰기 권한 | Fork, ZIP, 드라이브 (12.1장) |
 | 2 | 구글 시트 | 위 링크 (탭 2개) | **편집자** 권한 | 시트 공유 → 이메일 추가 |
 | 3 | Apps Script | 시트에 바인딩됨 (시트 메뉴 `확장 프로그램 → Apps Script`) | 시트 편집자면 열 수 있음. 원본은 [`apps-script/Code.gs`](apps-script/Code.gs) | 시트 권한 + 이 저장소의 사본 |
 | 4 | Netlify 사이트 | 현재 소유자의 Netlify 계정 (`lighthoongcalendar`) | **새 담당자가 본인 Netlify 계정으로 사이트를 새로 만듭니다.** 현재 소유자 계정에는 초대하지 않습니다 | 12장의 순서대로 새 담당자가 직접 진행 |
@@ -30,7 +30,7 @@
 
 | 보낼 것 | 방법 | 비고 |
 |---------|------|------|
-| **소스 코드 `index.html`** | GitHub 저장소 소유권 이전 또는 Fork (12장). 급하면 `index.html` 파일을 직접 전달 | 이 문서와 `Code.gs`만으로는 개발을 시작할 수 없습니다. **코드는 이 문서 폴더에 들어 있지 않습니다** |
+| **소스 코드 `index.html`** | 저장소가 Public이라 소유권 이전 없이도 가져갈 수 있습니다. Fork, ZIP 다운로드, 또는 `index.html`을 드라이브 등으로 직접 전달 (12.1장) | 이 문서와 `Code.gs`만으로는 개발을 시작할 수 없습니다. **코드(`index.html`)를 함께 보내야 합니다** |
 | 이 문서 (PDF 또는 HANDOVER.md) | 파일 전달 | 구조, 시트 구성, 설정 순서, 한계 |
 | `apps-script/Code.gs` | 파일 전달 (저장소에 올려 두면 더 좋음) | Apps Script 사본. 새로 배포할 때 필요 |
 | 구글 시트 | 같은 시트를 계속 쓸 때: 편집자로 공유. 새로 시작할 때: 사본 만들기 (12.2) | 데이터와 Apps Script가 여기에 있음 |
@@ -330,11 +330,13 @@ Apps Script는 **저장만으로는 반영되지 않습니다.** 반드시 새 �
 ```mermaid
 flowchart TD
   S["새 담당자가 본인 Netlify 계정으로 배포"] --> Q{"GitHub 저장소를<br/>어떻게 받나?"}
-  Q -->|"완전히 넘김 (권장)"| T["현재 소유자가 저장소 소유권 이전<br/>Settings → Danger Zone → Transfer"]
+  Q -->|"완전히 넘김"| T["현재 소유자가 저장소 소유권 이전<br/>Settings → Danger Zone → Transfer"]
   Q -->|"원본은 두고 복사"| F["새 담당자가 본인 계정으로 Fork"]
+  Q -->|"파일(ZIP, 드라이브)로 받음"| Z["본인 GitHub에 새 저장소를 만들어 파일 업로드"]
   Q -->|"GitHub 연결 없이"| M["Netlify Deploys 화면에 폴더를 끌어다 놓기<br/>수동 배포, 자동 배포 없음"]
   T --> N["새 담당자 Netlify에서<br/>Add new site → Import an existing project → GitHub"]
   F --> N
+  Z --> N
   N --> B["Branch main, Build command 비움<br/>Publish directory 는 저장소 루트"]
   B --> D["Deploy → 새 주소 발급"]
   D --> V["사이트에 일정 N개가 표시되는지 + 관리자 로그인 확인"]
@@ -343,9 +345,10 @@ flowchart TD
 
 **순서**
 
-1. **저장소 받기.** Netlify가 저장소에 웹훅과 배포 키를 만들려면 그 저장소의 **관리자 권한**이 필요해서, "쓰기 권한 초대"만으로는 연결이 안 될 수 있습니다. 그래서 둘 중 하나로 진행합니다.
-   - **소유권 이전(권장).** 현재 소유자: 저장소 `Settings → General → Danger Zone → Transfer ownership` → 새 담당자의 GitHub 아이디 입력 → 새 담당자가 수락. 이전 뒤에도 옛 저장소 주소는 새 주소로 연결됩니다.
+1. **저장소 받기.** Netlify가 저장소에 웹훅과 배포 키를 만들려면 그 저장소의 **관리자 권한**이 필요해서, "쓰기 권한 초대"만으로는 연결이 안 될 수 있습니다. 그래서 아래 중 하나로 진행합니다. 저장소가 Public이라 **현재 소유자의 승인 없이** 가져갈 수 있는 방법(Fork, 파일)이 가장 간단합니다.
+   - **소유권 이전.** 현재 소유자: 저장소 `Settings → General → Danger Zone → Transfer ownership` → 새 담당자의 GitHub 아이디 입력 → 새 담당자가 수락. 이전 뒤에도 옛 저장소 주소는 새 주소로 연결됩니다.
    - **Fork.** 새 담당자가 본인 계정으로 Fork 해서 그 Fork를 기준으로 개발·배포합니다. 원본은 현재 소유자에게 남습니다.
+   - **파일(ZIP·드라이브)로 받기.** 저장소 이전이나 Fork 없이 가능합니다. 받은 파일(`index.html`, `README.md` 등)을 새 담당자가 본인 GitHub에 `New repository`로 새 저장소를 만들어 올리고(`Add file → Upload files`) 그 저장소를 Netlify에 연결합니다. 원본 저장소와는 이어지지 않으므로 이후 변경 이력은 새 저장소가 기준이 됩니다.
 2. **Netlify 로그인.** https://app.netlify.com 에서 새 담당자 본인 계정(GitHub로 로그인하는 것이 가장 쉽습니다)으로 로그인합니다.
 3. **사이트 만들기.** `Add new site → Import an existing project → GitHub`에서 저장소를 고릅니다. GitHub 권한 요청이 뜨면 이 저장소에 한해 허용합니다.
 4. **빌드 설정.** 저장소에 `netlify.toml`이 없으므로 화면에서 직접 지정합니다. 이 프로젝트는 빌드가 없는 정적 파일 하나입니다.
